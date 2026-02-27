@@ -1,0 +1,41 @@
+# Binari compilati
+ostui
+test
+test_switch
+test_switch2
+/bin/
+/dist/
+
+# Tool AI di sviluppo
+.opencode/
+.ralph/
+openspec/
+
+# File di build/debug
+build_output.txt
+generate_readme.sh
+
+# OpenStack credentials — MAI nel repo
+clouds.yaml
+clouds.yml
+secure.yaml
+
+# Cache token ostui
+.cache/
+token-*.json
+
+# Go
+vendor/
+*.test
+*.out
+coverage.html
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
