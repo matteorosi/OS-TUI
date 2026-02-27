@@ -42,6 +42,9 @@ changelog:
       - "^chore:"
       - Merge pull request
       - Merge branch
+      - "Ralph iteration"
+      - "work in progress"
+      - "Adjust README"
 
 release:
   github:
