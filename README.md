@@ -7,6 +7,11 @@ A terminal user interface (TUI) for managing OpenStack clouds, built with Go, Bu
 
 ---
 
+<img width="700" height="323" alt="Screenshot at Feb 27 15-46-25" src="https://github.com/user-attachments/assets/8743140e-8d38-4b00-9240-e79a85628bf6" />
+
+<img width="951" height="1286" alt="Screenshot at Feb 27 15-45-50" src="https://github.com/user-attachments/assets/7d5415b9-c072-42f1-a086-5eee7420a230" />
+
+
 ## Features
 
 - **Full resource browsing** — navigate all major OpenStack services from a single interface. Every resource is drill-down navigable with `Enter`.
