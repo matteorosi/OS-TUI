@@ -2,26 +2,6 @@
 
 A terminal user interface (TUI) for managing OpenStack clouds, built with Go, Bubble Tea, and Gophercloud. Inspired by k9s.
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│  COMPUTE          │  ID                                  Name        │
-│  ▸ Servers        │  6ca8a09b-7be7-4668-9ab3-4cbbe6aaa03b  web-01   │
-│    Images         │  5ea21c32-2344-4094-ae11-2138f797f5e8  worker-1 │
-│    Flavors        │  a834fc38-3367-487f-a1fd-4c581d65a348  worker-2 │
-│    Keypairs       │                                                   │
-│    Hypervisors    │  [l] logs  [y] json  [i] inspect  [g] graph      │
-│    Limits         │  [detail] Press : for command mode               │
-│                   │                                                   │
-│  NETWORK          │                                                   │
-│    Networks       │                                                   │
-│    Load Balancers │                                                   │
-│    Floating IPs   │                                                   │
-│                   │                                                   │
-│  DNS              │                                                   │
-│    Zones          │                                                   │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
 ---
 
 ## Features
@@ -181,4 +161,4 @@ Open an issue to discuss major changes before submitting a pull request.
 
 ## License
 
-MIT
+Apache 2.0
