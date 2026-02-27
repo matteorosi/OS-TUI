@@ -6,11 +6,6 @@ test_switch2
 /bin/
 /dist/
 
-# Tool AI di sviluppo
-.opencode/
-.ralph/
-openspec/
-
 # File di build/debug
 build_output.txt
 generate_readme.sh
