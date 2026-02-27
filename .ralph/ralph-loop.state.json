@@ -1,0 +1,13 @@
+{
+  "active": true,
+  "iteration": 1,
+  "minIterations": 1,
+  "maxIterations": 5,
+  "completionPromise": "<promise>COMPLETE</promise>",
+  "tasksMode": false,
+  "taskPromise": "READY_FOR_NEXT_TASK",
+  "prompt": "In ~/Work/ostui fix [g] key not closing the server graph.\n\nFIRST: bash go build ./... 2>&1 | head -5\nSECOND: bash grep -n \"IsShowingGraph\\|case \\\"g\\\"\" internal/ui/app.go | head -10\n\nPROBLEM: In app.go the 'case \"g\":' handler intercepts the key before it reaches\nInstanceDetailModel, so the graph never closes when pressing g again.\n\nFIX: In internal/ui/app.go, in the 'case \"g\":' block, add this check BEFORE\nthe existing 'if m.state == stateDetail && m.detailModel != nil' block:\n\n    // If InstanceDetailModel is already showing graph, forward g to close it\n    if m.state == stateDetail && m.detailModel != nil {\n        if im, ok := m.detailModel.(compute.InstanceDetailModel); ok && im.IsShowingGraph() {\n            var cmd tea.Cmd\n            m.detailModel, cmd = m.detailModel.Update(msg)\n            return m, cmd\n        }\n    }\n\nNOTE: IsShowingGraph() is already defined in instance_detail_model.go:\nbash grep -n \"IsShowingGraph\" internal/ui/compute/instance_detail_model.go\n\nVERIFY: bash go build ./... 2>&1\nBuild must stay green.\nOutput <promise>COMPLETE</promise> when done.",
+  "startedAt": "2026-02-27T21:54:55.279Z",
+  "model": "",
+  "agent": "opencode"
+}

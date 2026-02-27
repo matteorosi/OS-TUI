@@ -1,0 +1,25 @@
+{
+  "iterations": [
+    {
+      "iteration": 1,
+      "startedAt": "2026-02-27T21:54:59.334Z",
+      "endedAt": "2026-02-27T21:55:53.425Z",
+      "durationMs": 51013,
+      "agent": "opencode",
+      "model": "",
+      "toolsUsed": {},
+      "filesModified": [
+        ".ralph/"
+      ],
+      "exitCode": 0,
+      "completionDetected": false,
+      "errors": []
+    }
+  ],
+  "totalDurationMs": 51013,
+  "struggleIndicators": {
+    "repeatedErrors": {},
+    "noProgressIterations": 0,
+    "shortIterations": 0
+  }
+}
