@@ -559,36 +559,33 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
-
-		case compute.OpenLogsMsg:
-			// Create logs model and switch to logs state.
-			m.logsModel = compute.NewLogsModel(m.computeClient, msg.ServerID)
-			m.state = stateLogs
-			return m, m.logsModel.Init()
-		case compute.GoBackMsg:
-			if m.state == stateLogs {
-				// Return to detail view.
-				m.state = stateDetail
-				m.logsModel = nil
-				return m, nil
-			} else if m.state == stateDetail && m.detailModel != nil {
-				// Forward GoBackMsg to detail model (handles embedded graph close)
-				var cmd tea.Cmd
-				m.detailModel, cmd = m.detailModel.Update(msg)
-				return m, cmd
-			} else if m.state == stateGraph {
-				// Return to detail view from graph.
-				m.state = stateDetail
-				m.graphModel = nil
-				return m, nil
-			}
-		case shell.CloseMsg:
-			m.state = stateSidebar
-			m.shellModel = nil
-			return m, nil
 		}
 	}
-
+	// Handle custom messages
+	switch msg := msg.(type) {
+	case compute.OpenLogsMsg:
+		m.logsModel = compute.NewLogsModel(m.computeClient, msg.ServerID)
+		m.state = stateLogs
+		return m, m.logsModel.Init()
+	case compute.GoBackMsg:
+		if m.state == stateLogs {
+			m.state = stateDetail
+			m.logsModel = nil
+			return m, nil
+		} else if m.state == stateDetail && m.detailModel != nil {
+			var cmd tea.Cmd
+			m.detailModel, cmd = m.detailModel.Update(msg)
+			return m, cmd
+		} else if m.state == stateGraph {
+			m.state = stateDetail
+			m.graphModel = nil
+			return m, nil
+		}
+	case shell.CloseMsg:
+		m.state = stateSidebar
+		m.shellModel = nil
+		return m, nil
+	}
 	// Command mode handling
 	if m.state == stateCommand {
 		// handle command mode key events

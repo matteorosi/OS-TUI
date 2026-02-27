@@ -174,7 +174,7 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 	}
 	// Start the Bubble Tea TUI
-	p := tea.NewProgram(ui.NewModel(provider, computeClient, networkClient, storageClient, identityClient, imageClient, limitsClient, dnsClient, lbClient))
+	p := tea.NewProgram(ui.NewModel(provider, cloudName, computeClient, networkClient, storageClient, identityClient, imageClient, limitsClient, dnsClient, lbClient))
 
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("error running TUI: %w", err)
