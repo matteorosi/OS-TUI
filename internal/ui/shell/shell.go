@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"os"
 	"os/exec"
 )
 
@@ -33,7 +34,7 @@ func NewShellModel(cloud, command string) ShellModel {
 func (m ShellModel) Init() tea.Cmd {
 	return tea.Batch(m.spinner.Tick, func() tea.Msg {
 		cmd := exec.Command("/bin/sh", "-c", "openstack "+m.command)
-		cmd.Env = append(cmd.Environ(), "OS_CLOUD="+m.cloud)
+		cmd.Env = append(os.Environ(), "OS_CLOUD="+m.cloud)
 		var out bytes.Buffer
 		var errOut bytes.Buffer
 		cmd.Stdout = &out

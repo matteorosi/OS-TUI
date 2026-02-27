@@ -145,7 +145,7 @@ func (m NetworkSubnetsModel) View() string {
 		rows := []table.Row{{"Failed to list subnets: " + m.err.Error()}}
 		return table.New(table.WithColumns(cols), table.WithRows(rows)).View()
 	}
-	return fmt.Sprintf("%s\n[g] graph", m.table.View())
+	return fmt.Sprintf("%s\n[g] graph  [esc] back", m.table.View())
 }
 
 // Table returns the underlying table model.

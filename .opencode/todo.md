@@ -1,0 +1,5 @@
+- [x] Fix [g] key not closing the server graph in internal/ui/app.go
+- [x] Ensure [g] graph present in internal/ui/storage/volume_detail_model.go
+- [x] Ensure [g] graph present in internal/ui/network/floating_ip_detail_model.go
+- [x] Add [g] graph before [esc] back in internal/ui/network/network_subnets_model.go
+- [x] Ensure [g] graph present in internal/ui/loadbalancer/detail.go

@@ -1,13 +1,13 @@
 {
   "active": true,
-  "iteration": 4,
+  "iteration": 1,
   "minIterations": 1,
   "maxIterations": 5,
   "completionPromise": "<promise>COMPLETE</promise>",
   "tasksMode": false,
   "taskPromise": "READY_FOR_NEXT_TASK",
-  "prompt": "In ~/Work/ostui fix [g] key not closing the server graph.\n\nFIRST: bash go build ./... 2>&1 | head -5\nSECOND: bash grep -n \"IsShowingGraph\\|case \\\"g\\\"\" internal/ui/app.go | head -10\n\nPROBLEM: In app.go the 'case \"g\":' handler intercepts the key before it reaches\nInstanceDetailModel, so the graph never closes when pressing g again.\n\nFIX: In internal/ui/app.go, in the 'case \"g\":' block, add this check BEFORE\nthe existing 'if m.state == stateDetail && m.detailModel != nil' block:\n\n    // If InstanceDetailModel is already showing graph, forward g to close it\n    if m.state == stateDetail && m.detailModel != nil {\n        if im, ok := m.detailModel.(compute.InstanceDetailModel); ok && im.IsShowingGraph() {\n            var cmd tea.Cmd\n            m.detailModel, cmd = m.detailModel.Update(msg)\n            return m, cmd\n        }\n    }\n\nNOTE: IsShowingGraph() is already defined in instance_detail_model.go:\nbash grep -n \"IsShowingGraph\" internal/ui/compute/instance_detail_model.go\n\nVERIFY: bash go build ./... 2>&1\nBuild must stay green.\nOutput <promise>COMPLETE</promise> when done.",
-  "startedAt": "2026-02-27T21:54:55.279Z",
+  "prompt": "In ~/Work/ostui add [g] graph hint to footer of detail models that support the graph view.\n\nFIRST: bash go build ./... 2>&1 | head -5\n\nFor each file below, find the last return in View() that shows the main table\n(the line with [esc] back) and add [g] graph to it.\n\nFILE 1: internal/ui/storage/volume_detail_model.go\nbash grep -n \"esc.*back\\|back.*esc\" internal/ui/storage/volume_detail_model.go | tail -3\nAdd [g] graph before [esc] back.\n\nFILE 2: internal/ui/network/floating_ip_detail_model.go\nbash grep -n \"esc.*back\\|back.*esc\" internal/ui/network/floating_ip_detail_model.go | tail -3\nAdd [g] graph before [esc] back.\n\nFILE 3: internal/ui/network/network_subnets_model.go\nbash grep -n \"esc.*back\\|back.*esc\" internal/ui/network/network_subnets_model.go | tail -3\nAdd [g] graph before [esc] back.\n\nFILE 4: internal/ui/loadbalancer/detail.go\nbash grep -n \"esc.*back\\|back.*esc\" internal/ui/loadbalancer/detail.go | tail -3\nAdd [g] graph before [esc] back.\n\nVERIFY: bash go build ./... 2>&1\nBuild must stay green.\nOutput <promise>COMPLETE</promise> when done.",
+  "startedAt": "2026-02-27T22:08:38.340Z",
   "model": "",
   "agent": "opencode"
 }
