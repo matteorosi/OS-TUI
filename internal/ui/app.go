@@ -692,11 +692,9 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 	if m.state == stateDetail && m.detailModel != nil {
-		if _, isKey := msg.(tea.KeyMsg); !isKey {
-			var cmd tea.Cmd
-			m.detailModel, cmd = m.detailModel.Update(msg)
-			return m, cmd
-		}
+		var cmd tea.Cmd
+		m.detailModel, cmd = m.detailModel.Update(msg)
+		return m, cmd
 	}
 	if m.state == stateGraph && m.graphModel != nil {
 		var cmd tea.Cmd
