@@ -1,6 +1,9 @@
-# ostui
+# OS-Tui
 
-A terminal user interface (TUI) for managing OpenStack clouds, built with Go, Bubble Tea, and Gophercloud. Inspired by k9s.
+A terminal user interface (TUI) for managing OpenStack clouds, built with Go, Bubble Tea, and Gophercloud.
+
+![Go Version](https://img.shields.io/badge/go-1.22+-blue)
+![License](https://img.shields.io/badge/license-Apache%202.0-green)
 
 ---
 
@@ -30,42 +33,99 @@ A terminal user interface (TUI) for managing OpenStack clouds, built with Go, Bu
 
 ---
 
-## Installation
+## Relationship Graph
 
-```bash
-# Clone the repository
-git clone https://github.com/your-org/ostui.git
-cd ostui
+Press `g` on any resource to see its connected objects as an ASCII graph.
 
-# Build the binary
-go build -o ostui ./cmd/ostui
+```
+╭──────────────────╮  ╭──────────────────╮  ╭──────────────────╮
+│ Vol: /dev/vda    │  │ Vol: /dev/vdb    │  │ Vol: /dev/vdc    │
+╰────────┬─────────╯  ╰────────┬─────────╯  ╰────────┬─────────╯
+         │                     │                      │
+╭────────┴─────────────────────┴──────────────────────┴──╮
+│ Server: web-01                  Status: ACTIVE          │
+╰────────────────────────────┬────────────────────────────╯
+                             │
+                  ╭──────────┴──────────╮
+                  │ Port                │ ── ╭──────────────────╮
+                  │ IP: 192.168.1.10    │    │ Net: prod-net    │
+                  ╰─────────────────────╯    ╰──────────────────╯
+                             │
+                  ╭──────────┴──────────╮
+                  │ FIP: 1.2.3.4        │
+                  ╰─────────────────────╯
 
-# (Optional) Install globally
-go install ./cmd/ostui
+[g] close  [j/k] scroll
 ```
 
+Available for: Servers, Networks, Volumes, Floating IPs, Load Balancers.
+
+---
+
+## Installation
+
 **Requirements:** Go 1.22+
+
+### Run directly
+
+```bash
+git clone https://github.com/your-org/ostui.git
+cd ostui
+go run ./cmd/ostui/main.go --cloud mycloud
+```
+
+### Build a binary
+
+```bash
+go build -o ostui ./cmd/ostui/main.go
+./ostui --cloud mycloud
+```
+
+### Install globally
+
+```bash
+go install ./cmd/ostui
+ostui --cloud mycloud
+```
 
 ---
 
 ## Quick Start
 
-```bash
-# Run against a cloud defined in your clouds.yaml
-ostui --cloud mycloud
+### 1. Find your cloud name
 
-# Specify a project and enable debug output
-ostui --cloud mycloud --project myproject --debug
-```
-
-Authentication uses your existing `clouds.yaml`:
+ostui reads from your existing `clouds.yaml`. To see which clouds are configured:
 
 ```bash
 # Default location
-~/.config/openstack/clouds.yaml
+cat ~/.config/openstack/clouds.yaml
 
-# Custom location via environment variable
-OS_CLIENT_CONFIG_FILE=/path/to/clouds.yaml ostui --cloud mycloud
+# The cloud names are the top-level keys, e.g.:
+# clouds:
+#   mycloud:        ← this is your cloud name
+#     auth:
+#       auth_url: https://...
+#   production:     ← or this one
+#     auth:
+#       ...
+```
+
+You can also check which cloud is currently active:
+
+```bash
+echo $OS_CLOUD
+```
+
+### 2. Launch
+
+```bash
+go run ./cmd/ostui/main.go --cloud mycloud
+
+# With debug output
+go run ./cmd/ostui/main.go --cloud mycloud --debug
+
+# Custom clouds.yaml location
+OS_CLIENT_CONFIG_FILE=/path/to/clouds.yaml go run ./cmd/ostui/main.go --cloud mycloud
 ```
 
 ---
@@ -76,8 +136,8 @@ OS_CLIENT_CONFIG_FILE=/path/to/clouds.yaml ostui --cloud mycloud
 
 | Flag | Description |
 |---|---|
-| `--cloud <name>` | Cloud configuration name from `clouds.yaml` (required) |
-| `--project <name>` | OpenStack project to work with (optional) |
+| `--cloud <n>` | Cloud name from `clouds.yaml` (required) |
+| `--project <n>` | OpenStack project to work with (optional) |
 | `--debug` | Enable verbose debug logging |
 
 ### Keyboard shortcuts
@@ -120,7 +180,8 @@ OS_CLIENT_CONFIG_FILE=/path/to/clouds.yaml ostui --cloud mycloud
 ## Project structure
 
 ```
-cmd/ostui/          ← entry point
+cmd/ostui/
+  main.go           ← entry point
 internal/
   client/           ← OpenStack client interfaces (compute, network, storage, dns, lb…)
   ui/
