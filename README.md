@@ -167,6 +167,7 @@ OS_CLIENT_CONFIG_FILE=/path/to/clouds.yaml go run ./cmd/ostui/main.go --cloud my
 | `:` | Command mode |
 | `?` | Context-sensitive help |
 | `c` | Switch cloud |
+| `T` | Topology View |
 | `q` | Quit |
 
 ### Command mode
