@@ -19,6 +19,7 @@ import (
 	"ostui/internal/ui/image"
 	"ostui/internal/ui/loadbalancer"
 	"ostui/internal/ui/network"
+	"ostui/internal/ui/search"
 	"ostui/internal/ui/shell"
 	"ostui/internal/ui/storage"
 	"ostui/internal/ui/topology"
@@ -57,6 +58,7 @@ const (
 	stateShell       = "shell"
 	stateGraph       = "graph"
 	stateTopology    = "topology"
+	stateSearch      = "search"
 )
 
 // AppModel is the root model of the TUI, managing a simple state machine.
@@ -96,6 +98,7 @@ type AppModel struct {
 	shellModel *shell.ShellModel
 	// topologyModel holds the topology view model.
 	topologyModel *topology.TopologyModel
+	searchModel   *search.SearchModel
 	// commandBar is the text input for command mode.
 	commandBar textinput.Model
 	// commandMap maps command strings to section titles.
@@ -175,6 +178,7 @@ func NewModel(provider *gophercloud.ProviderClient, cloudName string, compute cl
 		"quit":  "__quit__",
 		"zones": "Zones", "dns": "Zones",
 		"lb": "Load Balancers", "loadbalancers": "Load Balancers", "topology": "Topology", "topo": "Topology",
+		"search": "__search__",
 	}
 	return AppModel{provider: provider, cloudName: cloudName, computeClient: compute, networkClient: network, storageClient: storage, identityClient: identity, imageClient: image, limitsClient: limits, dnsClient: dns, lbClient: lb, sidebar: l, state: stateSidebar, prevState: "", commandBar: cmdBar, commandMap: cmdMap}
 }
@@ -231,6 +235,21 @@ func (m *AppModel) navigateTo(section string) {
 // Update implements tea.Model.
 func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case search.SearchDoneMsg:
+		m.state = stateSidebar
+		m.searchModel = nil
+		return m, nil
+	case search.SearchSelectedMsg:
+		navMap := m.navigationMap()
+		if constructor, ok := navMap[msg.Result.Category]; ok {
+			m.mainModel = constructor()
+			m.state = stateMain
+			m.searchModel = nil
+			return m, m.mainModel.Init()
+		}
+		m.state = stateSidebar
+		m.searchModel = nil
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -241,6 +260,17 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var cmd tea.Cmd
 			m.mainModel, cmd = m.mainModel.Update(msg)
 			cmds = append(cmds, cmd)
+		}
+		if m.state == stateSearch && m.searchModel != nil {
+			var cmd tea.Cmd
+			var newModel tea.Model
+			newModel, cmd = m.searchModel.Update(msg)
+			if sm, ok := newModel.(search.SearchModel); ok {
+				m.searchModel = &sm
+			} else {
+				m.searchModel = nil
+			}
+			return m, cmd
 		}
 		if m.state == stateLogs && m.logsModel != nil {
 			var cmd tea.Cmd
@@ -260,6 +290,16 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Batch(cmds...)
 	case tea.KeyMsg:
+		// Forward ALL keys to search model when in search state.
+		if m.state == stateSearch && m.searchModel != nil {
+			var cmd tea.Cmd
+			var newModel tea.Model
+			newModel, cmd = m.searchModel.Update(msg)
+			if sm, ok := newModel.(search.SearchModel); ok {
+				m.searchModel = &sm
+			}
+			return m, cmd
+		}
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
@@ -285,6 +325,13 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.modalActive = false
 				m.mainModel = nil
 				return m, nil
+			}
+		case "/":
+			if m.state == stateSidebar {
+				sm := search.NewSearchModel(m.computeClient, m.networkClient, m.storageClient, m.imageClient, m.width, m.height)
+				m.searchModel = &sm
+				m.state = stateSearch
+				return m, sm.Init()
 			}
 		case "c":
 			// Load cloud names and show selection list (original)
@@ -621,6 +668,17 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 						return m, nil
 					}
+					if cmd == "__search__" {
+						sm := search.NewSearchModel(m.computeClient, m.networkClient, m.storageClient, m.imageClient, m.width, m.height)
+						m.searchModel = &sm
+						m.state = stateSearch
+						m.commandBar.SetValue("")
+						m.commandBar.Blur()
+						// reset tab autocomplete state
+						m.tabMatches = nil
+						m.tabIndex = 0
+						return m, sm.Init()
+					}
 					if section, ok := m.commandMap[cmd]; ok {
 						if section == "__quit__" {
 							return m, tea.Quit
@@ -741,6 +799,26 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.logsModel, cmd = m.logsModel.Update(msg)
 		return m, cmd
 	}
+	// Catch-all: forward any unhandled message to search model.
+	if m.state == stateSearch && m.searchModel != nil {
+		var cmd tea.Cmd
+		var newModel tea.Model
+		newModel, cmd = m.searchModel.Update(msg)
+		if sm, ok := newModel.(search.SearchModel); ok {
+			m.searchModel = &sm
+		}
+		return m, cmd
+	}
+	// Catch-all: forward any unhandled message to search model.
+	if m.state == stateSearch && m.searchModel != nil {
+		var cmd tea.Cmd
+		var newModel tea.Model
+		newModel, cmd = m.searchModel.Update(msg)
+		if sm, ok := newModel.(search.SearchModel); ok {
+			m.searchModel = &sm
+		}
+		return m, cmd
+	}
 	// When in cloud select state, forward updates to the cloud list component.
 	//if m.state == stateCloudSelect {
 	//	var cmd tea.Cmd
@@ -789,7 +867,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View implements tea.Model.
 func (m AppModel) View() string {
-	footer := fmt.Sprintf("\n[%s] Press : for command mode  [T] topology", m.state)
+	footer := fmt.Sprintf("\n[%s] Press : for command mode  [T] topology  [/]", m.state) + " search"
 	switch m.state {
 	case stateSidebar:
 		sidebarWidth := 36
@@ -866,6 +944,11 @@ func (m AppModel) View() string {
 			return m.shellModel.View() + footer
 		}
 		return "" + footer
+	case stateSearch:
+		if m.searchModel != nil {
+			return m.searchModel.View() + footer
+		}
+		return "" + footer
 	case stateCommand:
 		// Render previous view plus command bar overlay, with autocomplete suggestions.
 		var base string
@@ -924,6 +1007,7 @@ func (m AppModel) helpView() string {
 	b.WriteString(key("?", "Toggle help"))
 	b.WriteString(key("c", "Switch cloud"))
 	b.WriteString(key(":", "Command mode"))
+	b.WriteString(key("/", "Global search (from sidebar)"))
 
 	switch m.prevState {
 	case stateMain:
