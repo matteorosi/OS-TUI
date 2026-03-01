@@ -6,6 +6,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
 	"ostui/internal/client"
 	"ostui/internal/ui/common"
+	"ostui/internal/ui/uiconst"
 )
 
 // DeleteVolume deletes a volume by its ID using the provided StorageClient.
@@ -13,7 +14,7 @@ import (
 func DeleteVolume(sc client.StorageClient, volumeID string) string {
 	err := sc.DeleteVolume(volumeID)
 	if err != nil {
-		cols := []table.Column{{Title: "Error", Width: 80}}
+		cols := []table.Column{{Title: "Error", Width: uiconst.ColWidthError}}
 		rows := []table.Row{{"Failed to delete volume: " + err.Error()}}
 		return common.NewTable(cols, rows).View()
 	}
@@ -26,12 +27,12 @@ func CreateSnapshot(sc client.StorageClient, volumeID, name string) string {
 	opts := snapshots.CreateOpts{VolumeID: volumeID, Name: name}
 	snap, err := sc.CreateSnapshot(opts)
 	if err != nil {
-		cols := []table.Column{{Title: "Error", Width: 80}}
+		cols := []table.Column{{Title: "Error", Width: uiconst.ColWidthError}}
 		rows := []table.Row{{"Failed to create snapshot: " + err.Error()}}
 		return common.NewTable(cols, rows).View()
 	}
 	// Show snapshot details in a table.
-	cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 20}, {Title: "VolumeID", Width: 36}, {Title: "Status", Width: 12}, {Title: "Created", Width: 20}}
+	cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "VolumeID", Width: uiconst.ColWidthUUID}, {Title: "Status", Width: uiconst.ColWidthStatus}, {Title: "Created", Width: uiconst.ColWidthField}}
 	rows := []table.Row{{snap.ID, snap.Name, snap.VolumeID, snap.Status, snap.CreatedAt.Format("2006-01-02 15:04:05")}}
 	return common.NewTable(cols, rows).View()
 }

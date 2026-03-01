@@ -53,7 +53,7 @@ func (m HypervisorDetailModel) Init() tea.Cmd {
 			return hypervisorDetailDataLoadedMsg{err: err}
 		}
 		// Build a two‑column table: split fields into two columns, with resource bars for VCPUs and Memory.
-		cols := []table.Column{{Title: "Field", Width: 20}, {Title: "Value", Width: 30}, {Title: "Field", Width: 20}, {Title: "Value", Width: 30}}
+		cols := []table.Column{{Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValueShort}, {Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValueShort}}
 		rows := []table.Row{{"ID", hv.ID}, {"Hostname", hv.HypervisorHostname}, {"State", hv.State}, {"Status", hv.Status}, {"VCPUs", func() string {
 			if hv.VCPUs == 0 {
 				return "N/A"

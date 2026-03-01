@@ -93,7 +93,7 @@ func (m LoadBalancerDetailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		lt.SetStyles(table.DefaultStyles())
 		m.listenersTable = lt
 		// Build pools table.
-		pcols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 30}, {Title: "Protocol", Width: 10}, {Title: "Algorithm", Width: 16}, {Title: "Status", Width: 14}}
+		pcols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthNameLong}, {Title: "Protocol", Width: uiconst.ColWidthProtocol}, {Title: "Algorithm", Width: uiconst.ColWidthAlgorithm}, {Title: "Status", Width: uiconst.ColWidthStatusLong}}
 		prows := []table.Row{}
 		for _, p := range m.pools {
 			prows = append(prows, table.Row{p.ID, p.Name, p.Protocol, p.LBAlgorithm, p.ProvisioningStatus})
