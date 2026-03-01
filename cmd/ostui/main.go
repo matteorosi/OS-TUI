@@ -150,27 +150,28 @@ func run(cmd *cobra.Command, args []string) error {
 	var dnsClient client.DNSClient
 	var lbClient client.LoadBalancerClient
 
-	dnsClient, err = client.NewDNSClient(providerV2, gophercloud.EndpointOpts{})
-	if err != nil {
-		log.Printf("warning: failed to create DNS client: %v", err)
-		dnsClient = nil
-	}
-	lbClient, err = client.NewLoadBalancerClient(providerV2, gophercloud.EndpointOpts{})
-	if err != nil {
-		log.Printf("warning: failed to create Load Balancer client: %v", err)
-		lbClient = nil
-	}
-
-	// Save token to cache
-	if tokenID := providerV2.Token(); tokenID != "" {
-		expiresAt := time.Now().Add(1 * time.Hour) // fallback
-		if tokenInfo, err := identityClient.GetTokenInfo(); err == nil && tokenInfo != nil {
-			expiresAt = tokenInfo.ExpiresAt
-		} else {
-			log.Printf("warning: failed to get token expiry, using fallback: %v", err)
+	if providerV2 != nil {
+		dnsClient, err = client.NewDNSClient(providerV2, gophercloud.EndpointOpts{})
+		if err != nil {
+			log.Printf("warning: failed to create DNS client: %v", err)
+			dnsClient = nil
 		}
-		if err := client.SaveCachedToken(cloudName, tokenID, expiresAt); err != nil {
-			log.Printf("warning: failed to save token cache: %v", err)
+		lbClient, err = client.NewLoadBalancerClient(providerV2, gophercloud.EndpointOpts{})
+		if err != nil {
+			log.Printf("warning: failed to create Load Balancer client: %v", err)
+			lbClient = nil
+		}
+		// Save token to cache
+		if tokenID := providerV2.Token(); tokenID != "" {
+			expiresAt := time.Now().Add(1 * time.Hour) // fallback
+			if tokenInfo, err := identityClient.GetTokenInfo(); err == nil && tokenInfo != nil {
+				expiresAt = tokenInfo.ExpiresAt
+			} else {
+				log.Printf("warning: failed to get token expiry, using fallback: %v", err)
+			}
+			if err := client.SaveCachedToken(cloudName, tokenID, expiresAt); err != nil {
+				log.Printf("warning: failed to save token cache: %v", err)
+			}
 		}
 	}
 	// Start the Bubble Tea TUI

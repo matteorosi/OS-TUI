@@ -18,6 +18,8 @@ type LoadBalancersModel struct {
 	err         error
 	spinner     spinner.Model
 	client      client.LoadBalancerClient
+	width       int
+	height      int
 	allRows     []table.Row
 	filterMode  bool
 	filter      textinput.Model
@@ -33,7 +35,7 @@ func NewLoadBalancersModel(lc client.LoadBalancerClient) LoadBalancersModel {
 	s.Spinner = spinner.Dot
 	ti := textinput.New()
 	ti.Placeholder = "filter..."
-	return LoadBalancersModel{client: lc, loading: true, spinner: s, filter: ti, mode: "list"}
+	return LoadBalancersModel{client: lc, loading: true, spinner: s, filter: ti, mode: "list", width: 120, height: 30}
 }
 
 type loadBalancersDataLoadedMsg struct {
@@ -58,7 +60,7 @@ func (m LoadBalancersModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(10),
+			table.WithHeight(m.height-6),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return loadBalancersDataLoadedMsg{tbl: t, rows: rows}
@@ -75,10 +77,17 @@ func (m LoadBalancersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.table = msg.tbl
+		m.updateTableColumns()
+		m.table.SetHeight(m.height - 6)
 		m.allRows = msg.rows
 		return m, nil
 	case tea.WindowSizeMsg:
-		// No special handling needed.
+		m.width = msg.Width
+		m.height = msg.Height
+		if m.table.Columns() != nil {
+			m.table.SetHeight(m.height - 6)
+			m.updateTableColumns()
+		}
 		return m, nil
 	case tea.KeyMsg:
 		// If we are in detail mode, forward keys to the detail model.
@@ -180,5 +189,17 @@ func (m LoadBalancersModel) View() string {
 
 // Table returns the primary table model (list view).
 func (m LoadBalancersModel) Table() table.Model { return m.table }
+
+func (m *LoadBalancersModel) updateTableColumns() {
+	idW := 36
+	vipW := 16
+	provW := 14
+	operW := 12
+	nameW := m.width - idW - vipW - provW - operW - 6
+	if nameW < 10 {
+		nameW = 10
+	}
+	m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "VIP Address", Width: vipW}, {Title: "Provisioning", Width: provW}, {Title: "Operating", Width: operW}})
+}
 
 var _ tea.Model = (*LoadBalancersModel)(nil)

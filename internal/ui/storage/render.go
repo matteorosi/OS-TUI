@@ -22,7 +22,7 @@ func RenderVolumes(sc client.StorageClient) string {
 		table.WithColumns(cols),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(10),
+		table.WithHeight(20),
 	)
 	t.SetStyles(table.DefaultStyles())
 	return t.View()
@@ -59,7 +59,7 @@ func RenderSnapshots(sc client.StorageClient) string {
 		table.WithColumns(cols),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(10),
+		table.WithHeight(20),
 	)
 	t.SetStyles(table.DefaultStyles())
 	return t.View()
@@ -80,7 +80,7 @@ func RenderBuckets(osc client.ObjectStorageClient) string {
 		table.WithColumns(cols),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(10),
+		table.WithHeight(20),
 	)
 	t.SetStyles(table.DefaultStyles())
 	return t.View()

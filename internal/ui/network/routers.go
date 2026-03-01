@@ -23,6 +23,8 @@ type RouterModel struct {
 	err        error
 	spinner    spinner.Model
 	client     client.NetworkClient
+	width      int
+	height     int
 
 	// Inspect view fields
 	inspectView     string
@@ -45,7 +47,7 @@ func NewRoutersModel(nc client.NetworkClient) RouterModel {
 	s.Spinner = spinner.Dot
 	ti := textinput.New()
 	ti.Placeholder = "filter..."
-	return RouterModel{client: nc, loading: true, spinner: s, filter: ti, mode: "list"}
+	return RouterModel{client: nc, loading: true, spinner: s, filter: ti, mode: "list", width: 120, height: 30}
 }
 
 // routersListMsg is emitted when the list of routers has been fetched.
@@ -79,7 +81,7 @@ func (m RouterModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(10),
+			table.WithHeight(m.height-6),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return routersListMsg{tbl: t, rows: rows}
@@ -103,7 +105,7 @@ func (m RouterModel) loadInterfacesCmd(routerID string) tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(10),
+			table.WithHeight(m.height-6),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return routerIfacesMsg{tbl: t}
@@ -120,6 +122,8 @@ func (m RouterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.table = msg.tbl
+		m.updateTableColumns()
+		m.table.SetHeight(m.height - 6)
 		m.allRows = msg.rows
 		return m, nil
 	case routerIfacesMsg:
@@ -133,7 +137,12 @@ func (m RouterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.mode = "detail"
 		return m, nil
 	case tea.WindowSizeMsg:
-		// No special handling needed.
+		m.width = msg.Width
+		m.height = msg.Height
+		if m.table.Columns() != nil {
+			m.table.SetHeight(m.height - 6)
+			m.updateTableColumns()
+		}
 		return m, nil
 	case tea.KeyMsg:
 		// Global escape handling: return to list view.
@@ -237,5 +246,16 @@ func (m RouterModel) View() string {
 
 // Table returns the primary table (list view) – useful for navigation.
 func (m RouterModel) Table() table.Model { return m.table }
+
+// updateTableColumns adjusts column widths based on the current width.
+func (m *RouterModel) updateTableColumns() {
+	idW := 36
+	statusW := 12
+	nameW := m.width - idW - statusW - 6
+	if nameW < 10 {
+		nameW = 10
+	}
+	m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "Status", Width: statusW}})
+}
 
 var _ tea.Model = (*RouterModel)(nil)

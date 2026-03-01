@@ -21,6 +21,9 @@ type HypervisorsModel struct {
 	allRows    []table.Row
 	filterMode bool
 	filter     textinput.Model
+	// Dynamic sizing
+	width  int
+	height int
 }
 
 // NewHypervisorsModel creates a new HypervisorsModel.
@@ -29,7 +32,8 @@ func NewHypervisorsModel(cc client.ComputeClient) HypervisorsModel {
 	s.Spinner = spinner.Dot
 	ti := textinput.New()
 	ti.Placeholder = "filter..."
-	return HypervisorsModel{client: cc, loading: true, spinner: s, filter: ti}
+	// Initialize with reasonable defaults.
+	return HypervisorsModel{client: cc, loading: true, spinner: s, filter: ti, width: 120, height: 30}
 }
 
 type hypervisorsDataLoadedMsg struct {
@@ -55,7 +59,7 @@ func (m HypervisorsModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(10),
+			table.WithHeight(m.height-6),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return hypervisorsDataLoadedMsg{tbl: t, rows: rows}
@@ -73,13 +77,20 @@ func (m HypervisorsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.table = msg.tbl
 		m.allRows = msg.rows
+		// Adjust columns and height based on current dimensions.
+		m.updateTableColumns()
+		m.table.SetHeight(m.height - 6)
 		return m, nil
 	case tea.WindowSizeMsg:
+		// Update stored dimensions and adjust table.
+		m.width = msg.Width
+		m.height = msg.Height
+		if m.table.Columns() != nil {
+			m.table.SetHeight(m.height - 6)
+			m.updateTableColumns()
+		}
 		return m, nil
 	case tea.KeyMsg:
-		if m.loading || m.err != nil {
-			return m, nil
-		}
 		// Filter mode handling – same pattern as InstancesModel.
 		if !m.filterMode && msg.String() == "/" {
 			m.filterMode = true
@@ -136,12 +147,28 @@ func (m HypervisorsModel) View() string {
 	if m.err != nil {
 		return fmt.Sprintf("Error: %s", m.err)
 	}
-	if m.filterMode {
-		filterLine := fmt.Sprintf("Filter: %s", m.filter.View())
-		footer := "esc: clear"
-		return fmt.Sprintf("%s\n%s\n%s", filterLine, m.table.View(), footer)
-	}
 	return m.table.View()
+}
+
+// updateTableColumns adjusts column widths based on the current width.
+func (m *HypervisorsModel) updateTableColumns() {
+	idW := 36
+	// Fixed column widths.
+	stateW := 6
+	statusW := 8
+	vcpusW := 6
+	vcpusUsedW := 10
+	ramW := 8
+	ramUsedW := 9
+	diskW := 8
+	diskUsedW := 9
+	// Compute flexible hostname width.
+	fixedTotal := idW + stateW + statusW + vcpusW + vcpusUsedW + ramW + ramUsedW + diskW + diskUsedW + 6 // margin
+	hostnameW := m.width - fixedTotal
+	if hostnameW < 10 {
+		hostnameW = 10
+	}
+	m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Hostname", Width: hostnameW}, {Title: "State", Width: stateW}, {Title: "Status", Width: statusW}, {Title: "VCPUs", Width: vcpusW}, {Title: "VCPUs Used", Width: vcpusUsedW}, {Title: "RAM MB", Width: ramW}, {Title: "RAM Used", Width: ramUsedW}, {Title: "Disk GB", Width: diskW}, {Title: "Disk Used", Width: diskUsedW}})
 }
 
 // Table returns the underlying table model.

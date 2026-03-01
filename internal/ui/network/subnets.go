@@ -16,6 +16,8 @@ type SubnetsModel struct {
 	err     error
 	spinner spinner.Model
 	client  client.NetworkClient
+	width   int
+	height  int
 	filter  textinput.Model
 }
 
@@ -30,7 +32,7 @@ func NewSubnetsModel(nc client.NetworkClient) SubnetsModel {
 	s.Spinner = spinner.Dot
 	ti := textinput.New()
 	ti.Placeholder = "filter..."
-	return SubnetsModel{client: nc, loading: true, spinner: s, filter: ti}
+	return SubnetsModel{client: nc, loading: true, spinner: s, filter: ti, width: 120, height: 30}
 }
 
 // Init starts async loading of subnets.
@@ -49,7 +51,7 @@ func (m SubnetsModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(10),
+			table.WithHeight(m.height-6),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return subnetsDataLoadedMsg{tbl: t}
@@ -66,8 +68,16 @@ func (m SubnetsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.table = msg.tbl
+		m.updateTableColumns()
+		m.table.SetHeight(m.height - 6)
 		return m, nil
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		if m.table.Columns() != nil {
+			m.table.SetHeight(m.height - 6)
+			m.updateTableColumns()
+		}
 		return m, nil
 	case tea.KeyMsg:
 		if m.loading || m.err != nil {
@@ -102,5 +112,17 @@ func (m SubnetsModel) View() string {
 // Ensure SubnetsModel implements tea.Model.
 // Table returns the underlying table model.
 func (m SubnetsModel) Table() table.Model { return m.table }
+
+// updateTableColumns adjusts column widths based on the current width.
+func (m *SubnetsModel) updateTableColumns() {
+	idW := 36
+	cidrW := 20
+	ipverW := 6
+	nameW := m.width - idW - cidrW - ipverW - 6
+	if nameW < 10 {
+		nameW = 10
+	}
+	m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "CIDR", Width: cidrW}, {Title: "IPVer", Width: ipverW}})
+}
 
 var _ tea.Model = (*SubnetsModel)(nil)

@@ -37,6 +37,8 @@ type SecurityGroupDetailModel struct {
 	inspectViewport viewport.Model
 	// stored security group JSON data
 	sgJSON securityGroupJSON
+	width  int
+	height int
 }
 
 type securityGroupDetailDataLoadedMsg struct {
@@ -50,7 +52,7 @@ type securityGroupDetailDataLoadedMsg struct {
 func NewSecurityGroupDetailModel(nc client.NetworkClient, sgID string) SecurityGroupDetailModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	return SecurityGroupDetailModel{client: nc, loading: true, spinner: s, sgID: sgID}
+	return SecurityGroupDetailModel{client: nc, loading: true, spinner: s, sgID: sgID, width: 120, height: 30}
 }
 
 // Init starts async loading of security group details.
@@ -112,7 +114,7 @@ func (m SecurityGroupDetailModel) Init() tea.Cmd {
 				table.WithColumns(ruleCols),
 				table.WithRows(ruleRows),
 				table.WithFocused(true),
-				table.WithHeight(10),
+				table.WithHeight(m.height-6),
 			)
 			rulesTbl.SetStyles(table.DefaultStyles())
 		}
@@ -138,6 +140,9 @@ func (m SecurityGroupDetailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table = msg.groupTbl
 		m.rulesTable = msg.rulesTbl
 		m.sgJSON = msg.sgJSON
+		m.updateTableColumns()
+		m.table.SetHeight(m.height - 6)
+		m.rulesTable.SetHeight(m.height - 6)
 		return m, nil
 	case tea.WindowSizeMsg:
 		if m.jsonView != "" {
@@ -146,43 +151,12 @@ func (m SecurityGroupDetailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.jsonViewport.SetContent(m.jsonView)
 			return m, nil
 		}
-		// Adjust group details table width to fill terminal.
-		if !m.loading && len(m.table.Columns()) > 0 {
-			cols := m.table.Columns()
-			if len(cols) > 0 {
-				totalWidth := msg.Width - 4
-				if totalWidth < 0 {
-					totalWidth = msg.Width
-				}
-				colWidth := totalWidth / len(cols)
-				if colWidth < 5 {
-					colWidth = 5
-				}
-				for i := range cols {
-					cols[i].Width = colWidth
-				}
-				m.table.SetColumns(cols)
-				m.table.SetWidth(msg.Width)
-			}
-		}
-		// Adjust rules table width to fill terminal.
-		if !m.loading && len(m.rulesTable.Columns()) > 0 {
-			cols := m.rulesTable.Columns()
-			if len(cols) > 0 {
-				totalWidth := msg.Width - 4
-				if totalWidth < 0 {
-					totalWidth = msg.Width
-				}
-				colWidth := totalWidth / len(cols)
-				if colWidth < 5 {
-					colWidth = 5
-				}
-				for i := range cols {
-					cols[i].Width = colWidth
-				}
-				m.rulesTable.SetColumns(cols)
-				m.rulesTable.SetWidth(msg.Width)
-			}
+		m.width = msg.Width
+		m.height = msg.Height
+		if !m.loading {
+			m.updateTableColumns()
+			m.table.SetHeight(m.height - 6)
+			m.rulesTable.SetHeight(m.height - 6)
 		}
 		return m, nil
 	case tea.KeyMsg:
@@ -274,5 +248,42 @@ func (m SecurityGroupDetailModel) View() string {
 
 // Table returns the underlying table model.
 func (m SecurityGroupDetailModel) Table() table.Model { return m.table }
+
+func (m *SecurityGroupDetailModel) updateTableColumns() {
+	// Update group details table columns proportionally.
+	if len(m.table.Columns()) > 0 {
+		cols := m.table.Columns()
+		totalWidth := m.width - 4
+		if totalWidth < 0 {
+			totalWidth = m.width
+		}
+		colWidth := totalWidth / len(cols)
+		if colWidth < 5 {
+			colWidth = 5
+		}
+		for i := range cols {
+			cols[i].Width = colWidth
+		}
+		m.table.SetColumns(cols)
+		m.table.SetWidth(m.width)
+	}
+	// Update rules table columns proportionally.
+	if len(m.rulesTable.Columns()) > 0 {
+		cols := m.rulesTable.Columns()
+		totalWidth := m.width - 4
+		if totalWidth < 0 {
+			totalWidth = m.width
+		}
+		colWidth := totalWidth / len(cols)
+		if colWidth < 5 {
+			colWidth = 5
+		}
+		for i := range cols {
+			cols[i].Width = colWidth
+		}
+		m.rulesTable.SetColumns(cols)
+		m.rulesTable.SetWidth(m.width)
+	}
+}
 
 var _ tea.Model = (*SecurityGroupDetailModel)(nil)

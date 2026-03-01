@@ -17,6 +17,8 @@ type UsersModel struct {
 	spinner spinner.Model
 	client  client.IdentityClient
 	filter  textinput.Model
+	width   int
+	height  int
 }
 
 type usersDataLoadedMsg struct {
@@ -30,7 +32,7 @@ func NewUsersModel(ic client.IdentityClient) UsersModel {
 	s.Spinner = spinner.Dot
 	ti := textinput.New()
 	ti.Placeholder = "filter..."
-	return UsersModel{client: ic, loading: true, spinner: s, filter: ti}
+	return UsersModel{client: ic, loading: true, spinner: s, filter: ti, width: 120, height: 30}
 }
 
 // Init starts async loading.
@@ -49,7 +51,7 @@ func (m UsersModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(10),
+			table.WithHeight(m.height-6),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return usersDataLoadedMsg{tbl: t}
@@ -66,8 +68,16 @@ func (m UsersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.table = msg.tbl
+		m.updateTableColumns()
+		m.table.SetHeight(m.height - 6)
 		return m, nil
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		if m.table.Columns() != nil {
+			m.table.SetHeight(m.height - 6)
+			m.updateTableColumns()
+		}
 		return m, nil
 	case tea.KeyMsg:
 		if m.loading || m.err != nil {
@@ -101,5 +111,17 @@ func (m UsersModel) View() string {
 
 // Ensure UsersModel implements tea.Model.
 func (m UsersModel) Table() table.Model { return m.table }
+
+// updateTableColumns adjusts column widths based on the current width.
+func (m *UsersModel) updateTableColumns() {
+	idW := 36
+	enabledW := 8
+	domainW := 20
+	nameW := m.width - idW - domainW - enabledW - 6
+	if nameW < 10 {
+		nameW = 10
+	}
+	m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "Domain ID", Width: domainW}, {Title: "Enabled", Width: enabledW}})
+}
 
 var _ tea.Model = (*UsersModel)(nil)

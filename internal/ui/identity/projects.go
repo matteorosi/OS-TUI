@@ -20,6 +20,8 @@ type ProjectsModel struct {
 	allRows    []table.Row
 	filterMode bool
 	filter     textinput.Model
+	width      int
+	height     int
 }
 
 type projectsDataLoadedMsg struct {
@@ -34,7 +36,7 @@ func NewProjectsModel(ic client.IdentityClient) ProjectsModel {
 	s.Spinner = spinner.Dot
 	ti := textinput.New()
 	ti.Placeholder = "filter..."
-	return ProjectsModel{client: ic, loading: true, spinner: s, filter: ti}
+	return ProjectsModel{client: ic, loading: true, spinner: s, filter: ti, width: 120, height: 30}
 }
 
 // Init starts async loading.
@@ -53,7 +55,7 @@ func (m ProjectsModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(10),
+			table.WithHeight(m.height-6),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return projectsDataLoadedMsg{tbl: t, rows: rows}
@@ -70,10 +72,17 @@ func (m ProjectsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.table = msg.tbl
+		m.updateTableColumns()
+		m.table.SetHeight(m.height - 6)
 		m.allRows = msg.rows
 		return m, nil
 	case tea.WindowSizeMsg:
-		// No resizing needed.
+		m.width = msg.Width
+		m.height = msg.Height
+		if m.table.Columns() != nil {
+			m.table.SetHeight(m.height - 6)
+			m.updateTableColumns()
+		}
 		return m, nil
 	case tea.KeyMsg:
 		if m.loading || m.err != nil {
@@ -149,5 +158,15 @@ func (m ProjectsModel) View() string {
 
 // Ensure ProjectsModel implements tea.Model.
 func (m ProjectsModel) Table() table.Model { return m.table }
+
+func (m *ProjectsModel) updateTableColumns() {
+	idW := 36
+	domainW := 20
+	nameW := m.width - idW - domainW - 6
+	if nameW < 10 {
+		nameW = 10
+	}
+	m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "Domain ID", Width: domainW}})
+}
 
 var _ tea.Model = (*ProjectsModel)(nil)

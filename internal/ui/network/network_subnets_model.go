@@ -20,6 +20,8 @@ type NetworkSubnetsModel struct {
 	allRows    []table.Row
 	filterMode bool
 	filter     textinput.Model
+	width      int
+	height     int
 }
 
 // ResourceID returns the network ID.
@@ -40,7 +42,7 @@ func NewNetworkSubnetsModel(nc client.NetworkClient, networkID string) NetworkSu
 	s.Spinner = spinner.Dot
 	ti := textinput.New()
 	ti.Placeholder = "filter..."
-	return NetworkSubnetsModel{client: nc, loading: true, spinner: s, networkID: networkID, filter: ti}
+	return NetworkSubnetsModel{client: nc, loading: true, spinner: s, networkID: networkID, filter: ti, width: 120, height: 30}
 }
 
 // Init starts async loading of subnets for the specified network.
@@ -62,7 +64,7 @@ func (m NetworkSubnetsModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(10),
+			table.WithHeight(m.height-6),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return networkSubnetsDataLoadedMsg{tbl: t, rows: rows}
@@ -80,8 +82,16 @@ func (m NetworkSubnetsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.table = msg.tbl
 		m.allRows = msg.rows
+		m.updateTableColumns()
+		m.table.SetHeight(m.height - 6)
 		return m, nil
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		if !m.loading {
+			m.updateTableColumns()
+			m.table.SetHeight(m.height - 6)
+		}
 		return m, nil
 	case tea.KeyMsg:
 		if m.loading || m.err != nil {
@@ -150,5 +160,20 @@ func (m NetworkSubnetsModel) View() string {
 
 // Table returns the underlying table model.
 func (m NetworkSubnetsModel) Table() table.Model { return m.table }
+
+func (m *NetworkSubnetsModel) updateTableColumns() {
+	if len(m.table.Columns()) > 0 {
+		// Fixed widths
+		idW := 36
+		cidrW := 20
+		ipverW := 6
+		// Remaining width for Name column
+		nameW := m.width - idW - cidrW - ipverW - 6
+		if nameW < 10 {
+			nameW = 10
+		}
+		m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "CIDR", Width: cidrW}, {Title: "IPVer", Width: ipverW}})
+	}
+}
 
 var _ tea.Model = (*NetworkSubnetsModel)(nil)

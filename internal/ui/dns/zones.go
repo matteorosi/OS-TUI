@@ -21,6 +21,8 @@ type ZonesModel struct {
 	allRows     []table.Row
 	filterMode  bool
 	filter      textinput.Model
+	width       int
+	height      int
 	mode        string // "list" or "detail"
 	zoneID      string
 	zoneName    string
@@ -33,7 +35,7 @@ func NewZonesModel(dc client.DNSClient) ZonesModel {
 	s.Spinner = spinner.Dot
 	ti := textinput.New()
 	ti.Placeholder = "filter..."
-	return ZonesModel{client: dc, loading: true, spinner: s, filter: ti, mode: "list"}
+	return ZonesModel{client: dc, loading: true, spinner: s, filter: ti, mode: "list", width: 120, height: 30}
 }
 
 type zonesDataLoadedMsg struct {
@@ -58,7 +60,7 @@ func (m ZonesModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(10),
+			table.WithHeight(m.height-6),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return zonesDataLoadedMsg{tbl: t, rows: rows}
@@ -76,9 +78,16 @@ func (m ZonesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.table = msg.tbl
 		m.allRows = msg.rows
+		m.updateTableColumns()
+		m.table.SetHeight(m.height - 6)
 		return m, nil
 	case tea.WindowSizeMsg:
-		// No special handling needed.
+		m.width = msg.Width
+		m.height = msg.Height
+		if !m.loading {
+			m.updateTableColumns()
+			m.table.SetHeight(m.height - 6)
+		}
 		return m, nil
 	case tea.KeyMsg:
 		// If we are in detail mode, forward keys to the detail model.
@@ -184,5 +193,18 @@ func (m ZonesModel) View() string {
 
 // Table returns the primary table model (list view).
 func (m ZonesModel) Table() table.Model { return m.table }
+
+func (m *ZonesModel) updateTableColumns() {
+	if len(m.table.Columns()) > 0 {
+		idW := 36
+		statusW := 12
+		ttlW := 8
+		nameW := m.width - idW - statusW - ttlW - 6
+		if nameW < 10 {
+			nameW = 10
+		}
+		m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "Status", Width: statusW}, {Title: "TTL", Width: ttlW}})
+	}
+}
 
 var _ tea.Model = (*ZonesModel)(nil)

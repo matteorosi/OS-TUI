@@ -20,6 +20,10 @@ type FloatingIPsModel struct {
 	allRows    []table.Row
 	filterMode bool
 	filter     textinput.Model
+
+	// Dynamic sizing
+	width  int
+	height int
 }
 
 type floatingIPsDataLoadedMsg struct {
@@ -34,7 +38,7 @@ func NewFloatingIPsModel(nc client.NetworkClient) FloatingIPsModel {
 	s.Spinner = spinner.Dot
 	ti := textinput.New()
 	ti.Placeholder = "filter..."
-	return FloatingIPsModel{client: nc, loading: true, spinner: s, filter: ti}
+	return FloatingIPsModel{client: nc, loading: true, spinner: s, filter: ti, width: 120, height: 30}
 }
 
 // Init starts async loading of floating IPs.
@@ -44,7 +48,7 @@ func (m FloatingIPsModel) Init() tea.Cmd {
 		if err != nil {
 			return floatingIPsDataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "ID", Width: 36}, {Title: "FloatingNetworkID", Width: 36}, {Title: "FixedIP", Width: 15}, {Title: "PortID", Width: 36}, {Title: "Status", Width: 12}}
+		cols := []table.Column{{Title: "ID", Width: 36}, {Title: "FloatingNetworkID", Width: 36}, {Title: "FixedIP", Width: 20}, {Title: "PortID", Width: 36}, {Title: "Status", Width: 12}}
 		rows := []table.Row{}
 		for _, f := range fipList {
 			rows = append(rows, table.Row{f.ID, f.FloatingNetworkID, f.FixedIP, f.PortID, f.Status})
@@ -53,7 +57,7 @@ func (m FloatingIPsModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(10),
+			table.WithHeight(m.height-6),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return floatingIPsDataLoadedMsg{tbl: t, rows: rows}
@@ -71,8 +75,16 @@ func (m FloatingIPsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.table = msg.tbl
 		m.allRows = msg.rows
+		m.updateTableColumns()
+		m.table.SetHeight(m.height - 6)
 		return m, nil
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		if m.table.Columns() != nil {
+			m.table.SetHeight(m.height - 6)
+			m.updateTableColumns()
+		}
 		return m, nil
 	case tea.KeyMsg:
 		if m.loading || m.err != nil {
@@ -142,6 +154,20 @@ func (m FloatingIPsModel) View() string {
 		return fmt.Sprintf("%s\n%s\n%s", filterLine, m.table.View(), footer)
 	}
 	return m.table.View()
+}
+
+// updateTableColumns adjusts column widths based on the current width.
+func (m *FloatingIPsModel) updateTableColumns() {
+	idW := 36
+	fnetW := 36
+	portIDW := 36
+	statusW := 12
+	// FixedIP column gets remaining space
+	fixedIPW := m.width - idW - fnetW - portIDW - statusW - 6
+	if fixedIPW < 10 {
+		fixedIPW = 10
+	}
+	m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "FloatingNetworkID", Width: fnetW}, {Title: "FixedIP", Width: fixedIPW}, {Title: "PortID", Width: portIDW}, {Title: "Status", Width: statusW}})
 }
 
 // Ensure FloatingIPsModel implements tea.Model.

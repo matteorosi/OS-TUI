@@ -34,7 +34,7 @@ func RenderInstances(cc client.ComputeClient) string {
 		table.WithColumns(cols),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(10),
+		table.WithHeight(20),
 	)
 	t.SetStyles(table.DefaultStyles())
 	return t.View()

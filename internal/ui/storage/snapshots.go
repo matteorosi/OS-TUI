@@ -15,6 +15,8 @@ type SnapshotsModel struct {
 	err     error
 	spinner spinner.Model
 	client  client.StorageClient
+	width   int
+	height  int
 }
 
 type snapshotsDataLoadedMsg struct {
@@ -26,7 +28,7 @@ type snapshotsDataLoadedMsg struct {
 func NewSnapshotsModel(sc client.StorageClient) SnapshotsModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	return SnapshotsModel{client: sc, loading: true, spinner: s}
+	return SnapshotsModel{client: sc, loading: true, spinner: s, width: 120, height: 30}
 }
 
 // Init starts async loading of snapshots.
@@ -45,7 +47,7 @@ func (m SnapshotsModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(10),
+			table.WithHeight(m.height-6),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return snapshotsDataLoadedMsg{tbl: t}
@@ -62,8 +64,16 @@ func (m SnapshotsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.table = msg.tbl
+		m.updateTableColumns()
+		m.table.SetHeight(m.height - 6)
 		return m, nil
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		if m.table.Columns() != nil {
+			m.table.SetHeight(m.height - 6)
+			m.updateTableColumns()
+		}
 		return m, nil
 	case tea.KeyMsg:
 		if m.loading || m.err != nil {
@@ -97,5 +107,25 @@ func (m SnapshotsModel) View() string {
 
 // Ensure SnapshotsModel implements tea.Model.
 func (m SnapshotsModel) Table() table.Model { return m.table }
+
+func (m *SnapshotsModel) updateTableColumns() {
+	idW := 36
+	volIDW := 36
+	sizeW := 6
+	statusW := 12
+	remaining := m.width - idW - volIDW - sizeW - statusW - 6
+	if remaining < 20 {
+		remaining = 20
+	}
+	nameW := remaining / 2
+	createdW := remaining - nameW
+	if nameW < 10 {
+		nameW = 10
+	}
+	if createdW < 10 {
+		createdW = 10
+	}
+	m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "VolumeID", Width: volIDW}, {Title: "Size", Width: sizeW}, {Title: "Status", Width: statusW}, {Title: "Created", Width: createdW}})
+}
 
 var _ tea.Model = (*SnapshotsModel)(nil)

@@ -5,7 +5,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
-	"github.com/charmbracelet/bubbletea"
+	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
 	"strings"
 )
@@ -20,6 +20,10 @@ type InstancesModel struct {
 	allRows    []table.Row
 	filterMode bool
 	filter     textinput.Model
+
+	// Dynamic sizing
+	width  int
+	height int
 }
 
 // NewInstancesModel creates a new InstancesModel with the given compute client.
@@ -29,7 +33,7 @@ func NewInstancesModel(cc client.ComputeClient) InstancesModel {
 	// Use default style (no explicit style set).
 	ti := textinput.New()
 	ti.Placeholder = "filter..."
-	return InstancesModel{client: cc, loading: true, spinner: s, filter: ti}
+	return InstancesModel{client: cc, loading: true, spinner: s, filter: ti, width: 120, height: 30}
 }
 
 // dataLoadedMsg is sent when instance data has been fetched.
@@ -55,7 +59,7 @@ func (m InstancesModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(10),
+			table.WithHeight(m.height-6),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return dataLoadedMsg{tbl: t, rows: rows}
@@ -73,9 +77,16 @@ func (m InstancesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.table = msg.tbl
 		m.allRows = msg.rows
+		m.updateTableColumns()
+		m.table.SetHeight(m.height - 6)
 		return m, nil
 	case tea.WindowSizeMsg:
-		m.table.SetHeight(msg.Height - 6)
+		m.width = msg.Width
+		m.height = msg.Height
+		if m.table.Columns() != nil {
+			m.table.SetHeight(m.height - 6)
+			m.updateTableColumns()
+		}
 		return m, nil
 	case tea.KeyMsg:
 		if m.loading || m.err != nil {
@@ -145,6 +156,17 @@ func (m InstancesModel) View() string {
 		return fmt.Sprintf("%s\n%s\n%s", filterLine, m.table.View(), footer)
 	}
 	return m.table.View()
+}
+
+// updateTableColumns adjusts column widths based on the current width.
+func (m *InstancesModel) updateTableColumns() {
+	idW := 36
+	statusW := 12
+	nameW := m.width - idW - statusW - 6
+	if nameW < 10 {
+		nameW = 10
+	}
+	m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "Status", Width: statusW}})
 }
 
 // Ensure InstancesModel implements tea.Model.

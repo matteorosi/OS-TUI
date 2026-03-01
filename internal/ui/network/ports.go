@@ -34,6 +34,10 @@ type PortsModel struct {
 	allRows    []table.Row
 	filterMode bool
 	filter     textinput.Model
+
+	// Dynamic sizing
+	width  int
+	height int
 }
 
 // NewPortsModel creates a PortsModel ready to load port data.
@@ -42,7 +46,7 @@ func NewPortsModel(nc client.NetworkClient) PortsModel {
 	s.Spinner = spinner.Dot
 	ti := textinput.New()
 	ti.Placeholder = "filter..."
-	return PortsModel{client: nc, loading: true, spinner: s, filter: ti, mode: "list"}
+	return PortsModel{client: nc, loading: true, spinner: s, filter: ti, mode: "list", width: 120, height: 30}
 }
 
 // portsListMsg is emitted when the list of ports has been fetched.
@@ -75,7 +79,7 @@ func (m PortsModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(10),
+			table.WithHeight(m.height-6),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return portsListMsg{tbl: t, rows: rows}
@@ -112,6 +116,8 @@ func (m PortsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.table = msg.tbl
 		m.allRows = msg.rows
+		m.updateTableColumns()
+		m.table.SetHeight(m.height - 6)
 		return m, nil
 	case portDetailMsg:
 		m.loading = false
@@ -124,6 +130,12 @@ func (m PortsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.mode = "detail"
 		return m, nil
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		if m.table.Columns() != nil {
+			m.table.SetHeight(m.height - 6)
+			m.updateTableColumns()
+		}
 		return m, nil
 	case tea.KeyMsg:
 		// If Inspect view is active, handle its keys.
@@ -242,6 +254,18 @@ func (m PortsModel) View() string {
 	// Detail view
 	header := fmt.Sprintf("Port %s details (press esc to go back)", m.portID)
 	return fmt.Sprintf("%s\n%s", header, m.detailTable.View())
+}
+
+// updateTableColumns adjusts column widths based on the current width.
+func (m *PortsModel) updateTableColumns() {
+	idW := 36
+	netIDW := 36
+	statusW := 12
+	nameW := m.width - idW - netIDW - statusW - 6
+	if nameW < 10 {
+		nameW = 10
+	}
+	m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "Network ID", Width: netIDW}, {Title: "Status", Width: statusW}})
 }
 
 // Table returns the primary table (list view) – useful for navigation.

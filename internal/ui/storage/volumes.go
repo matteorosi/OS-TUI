@@ -20,6 +20,8 @@ type VolumesModel struct {
 	allRows    []table.Row
 	filterMode bool
 	filter     textinput.Model
+	width      int
+	height     int
 }
 
 // NewVolumesModel creates a new VolumesModel with the given storage client.
@@ -28,7 +30,7 @@ func NewVolumesModel(sc client.StorageClient) VolumesModel {
 	s.Spinner = spinner.Dot
 	ti := textinput.New()
 	ti.Placeholder = "filter..."
-	return VolumesModel{client: sc, loading: true, spinner: s, filter: ti}
+	return VolumesModel{client: sc, loading: true, spinner: s, filter: ti, width: 120, height: 30}
 }
 
 // dataLoadedMsg is sent when volume data has been fetched.
@@ -54,7 +56,7 @@ func (m VolumesModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(10),
+			table.WithHeight(m.height-6),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return dataLoadedMsg{tbl: t, rows: rows}
@@ -72,9 +74,16 @@ func (m VolumesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.table = msg.tbl
 		m.allRows = msg.rows
+		m.updateTableColumns()
+		m.table.SetHeight(m.height - 6)
 		return m, nil
 	case tea.WindowSizeMsg:
-		// No resizing needed.
+		m.width = msg.Width
+		m.height = msg.Height
+		if m.table.Columns() != nil {
+			m.table.SetHeight(m.height - 6)
+			m.updateTableColumns()
+		}
 		return m, nil
 	case tea.KeyMsg:
 		if m.loading || m.err != nil {
@@ -144,6 +153,18 @@ func (m VolumesModel) View() string {
 		return fmt.Sprintf("%s\n%s\n%s", filterLine, m.table.View(), footer)
 	}
 	return m.table.View()
+}
+
+// updateTableColumns adjusts column widths based on the current width.
+func (m *VolumesModel) updateTableColumns() {
+	idW := 36
+	sizeW := 8
+	statusW := 12
+	nameW := m.width - idW - sizeW - statusW - 6
+	if nameW < 10 {
+		nameW = 10
+	}
+	m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "Size", Width: sizeW}, {Title: "Status", Width: statusW}})
 }
 
 // Ensure VolumesModel implements tea.Model.

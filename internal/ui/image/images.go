@@ -21,6 +21,9 @@ type ImagesModel struct {
 	allRows    []table.Row
 	filterMode bool
 	filter     textinput.Model
+	// Dynamic sizing
+	width  int
+	height int
 }
 
 // NewImagesModel creates a new ImagesModel with the given image client.
@@ -29,7 +32,8 @@ func NewImagesModel(ic client.ImageClient) ImagesModel {
 	s.Spinner = spinner.Dot
 	ti := textinput.New()
 	ti.Placeholder = "filter..."
-	return ImagesModel{client: ic, loading: true, spinner: s, filter: ti}
+	// Initialize with reasonable defaults.
+	return ImagesModel{client: ic, loading: true, spinner: s, filter: ti, width: 120, height: 30}
 }
 
 type imagesDataLoadedMsg struct {
@@ -54,7 +58,7 @@ func (m ImagesModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(10),
+			table.WithHeight(m.height-6),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return imagesDataLoadedMsg{tbl: t, rows: rows}
@@ -72,28 +76,17 @@ func (m ImagesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.table = msg.tbl
 		m.allRows = msg.rows
+		// Adjust columns and height based on current dimensions.
+		m.updateTableColumns()
+		m.table.SetHeight(m.height - 6)
 		return m, nil
 	case tea.WindowSizeMsg:
-		// Adjust table width to fill the terminal width.
-		if !m.loading && len(m.table.Columns()) > 0 {
-			cols := m.table.Columns()
-			if len(cols) > 0 {
-				// Compute a column width that distributes the available space evenly.
-				// Subtract a small margin (4 characters) to avoid overflow.
-				totalWidth := msg.Width - 4
-				if totalWidth < 0 {
-					totalWidth = msg.Width
-				}
-				colWidth := totalWidth / len(cols)
-				if colWidth < 5 {
-					colWidth = 5
-				}
-				for i := range cols {
-					cols[i].Width = colWidth
-				}
-				m.table.SetColumns(cols)
-				m.table.SetWidth(msg.Width)
-			}
+		// Update stored dimensions and adjust table.
+		m.width = msg.Width
+		m.height = msg.Height
+		if m.table.Columns() != nil {
+			m.table.SetHeight(m.height - 6)
+			m.updateTableColumns()
 		}
 		return m, nil
 	case tea.KeyMsg:
@@ -107,7 +100,6 @@ func (m ImagesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, textinput.Blink
 		}
 		if m.filterMode && msg.String() == "esc" {
-			// clear filter
 			m.filterMode = false
 			m.filter.Blur()
 			m.filter.SetValue("")
@@ -163,6 +155,18 @@ func (m ImagesModel) View() string {
 		return fmt.Sprintf("%s\n%s\n%s", filterLine, m.table.View(), footer)
 	}
 	return m.table.View()
+}
+
+// updateTableColumns adjusts column widths based on the current width.
+func (m *ImagesModel) updateTableColumns() {
+	idW := 36
+	statusW := 12
+	// Compute flexible name width.
+	nameW := m.width - idW - statusW - 6
+	if nameW < 10 {
+		nameW = 10
+	}
+	m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "Status", Width: statusW}})
 }
 
 // Table returns the underlying table model.

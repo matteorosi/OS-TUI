@@ -21,6 +21,7 @@ import (
 	"ostui/internal/ui/network"
 	"ostui/internal/ui/shell"
 	"ostui/internal/ui/storage"
+	"ostui/internal/ui/topology"
 )
 
 // item represents a selectable entry in the sidebar.
@@ -55,6 +56,7 @@ const (
 	stateCommand     = "command"
 	stateShell       = "shell"
 	stateGraph       = "graph"
+	stateTopology    = "topology"
 )
 
 // AppModel is the root model of the TUI, managing a simple state machine.
@@ -92,6 +94,8 @@ type AppModel struct {
 	logsModel tea.Model
 	// shellModel holds the shell passthrough model.
 	shellModel *shell.ShellModel
+	// topologyModel holds the topology view model.
+	topologyModel *topology.TopologyModel
 	// commandBar is the text input for command mode.
 	commandBar textinput.Model
 	// commandMap maps command strings to section titles.
@@ -126,6 +130,9 @@ func NewModel(provider *gophercloud.ProviderClient, cloudName string, compute cl
 		item{title: "=== STORAGE ===", description: ""},
 		item{title: "Volumes", description: "List and manage volumes"},
 		item{title: "Snapshots", description: "List and manage snapshots"},
+		// Topology section
+		item{title: "=== TOPOLOGY ===", description: ""},
+		item{title: "Topology", description: "View topology of resources"},
 		// Identity section
 		item{title: "=== IDENTITY ===", description: ""},
 		item{title: "Projects", description: "List OpenStack projects"},
@@ -167,7 +174,7 @@ func NewModel(provider *gophercloud.ProviderClient, cloudName string, compute cl
 		"keypairs": "Keypairs", "kp": "Keypairs",
 		"quit":  "__quit__",
 		"zones": "Zones", "dns": "Zones",
-		"lb": "Load Balancers", "loadbalancers": "Load Balancers",
+		"lb": "Load Balancers", "loadbalancers": "Load Balancers", "topology": "Topology", "topo": "Topology",
 	}
 	return AppModel{provider: provider, cloudName: cloudName, computeClient: compute, networkClient: network, storageClient: storage, identityClient: identity, imageClient: image, limitsClient: limits, dnsClient: dns, lbClient: lb, sidebar: l, state: stateSidebar, prevState: "", commandBar: cmdBar, commandMap: cmdMap}
 }
@@ -216,6 +223,10 @@ func (m *AppModel) navigateTo(section string) {
 		m.mainModel = dns.NewZonesModel(m.dnsClient)
 	case "Load Balancers":
 		m.mainModel = loadbalancer.NewLoadBalancersModel(m.lbClient)
+	case "Topology":
+		tm := topology.NewTopologyModel(m.computeClient, m.networkClient, m.storageClient)
+		m.topologyModel = &tm
+		m.state = stateTopology
 	default:
 		// No submodel for unknown sections.
 	}
@@ -227,7 +238,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.sidebar.SetSize(msg.Width/5, msg.Height-4)
+		m.sidebar.SetSize(34, msg.Height-4)
 		// Forward the window size message to the active submodel (if any).
 		var cmds []tea.Cmd
 		if m.mainModel != nil {
@@ -280,7 +291,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		case "c":
-			// Load cloud names and show selection list.
+			// Load cloud names and show selection list (original)
 			clouds, err := clientconfig.LoadCloudsYAML()
 			if err != nil {
 				// ignore error, stay in current state
@@ -300,6 +311,12 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cloudList = l
 			m.state = stateCloudSelect
 			return m, nil
+		case "T":
+			// Open topology view
+			tm := topology.NewTopologyModel(m.computeClient, m.networkClient, m.storageClient)
+			m.topologyModel = &tm
+			m.state = stateTopology
+			return m, m.topologyModel.Init()
 		case ":":
 			// Enter command mode
 			m.prevState = m.state
@@ -397,9 +414,14 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.mainModel = dns.NewZonesModel(m.dnsClient)
 					case "Load Balancers":
 						m.mainModel = loadbalancer.NewLoadBalancersModel(m.lbClient)
+					case "Topology":
+						tm := topology.NewTopologyModel(m.computeClient, m.networkClient, m.storageClient)
+						m.topologyModel = &tm
+						m.state = stateTopology
 					default:
 						// Fallback: no submodel – keep nil.
 					}
+
 					// If a submodel was created, invoke its Init to start async loading.
 					if m.mainModel != nil {
 						return m, m.mainModel.Init()
@@ -581,6 +603,10 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.graphModel = nil
 			return m, nil
 		}
+	case topology.CloseMsg:
+		m.state = stateSidebar
+		m.topologyModel = nil
+		return m, nil
 	case shell.CloseMsg:
 		m.state = stateSidebar
 		m.shellModel = nil
@@ -618,6 +644,18 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.tabIndex = 0
 						return m, m.shellModel.Init()
 					}
+					if cmd == "topology" || cmd == "topo" {
+						// Open topology view directly
+						tm := topology.NewTopologyModel(m.computeClient, m.networkClient, m.storageClient)
+						m.topologyModel = &tm
+						m.state = stateTopology
+						m.commandBar.SetValue("")
+						m.commandBar.Blur()
+						// reset tab autocomplete state
+						m.tabMatches = nil
+						m.tabIndex = 0
+						return m, m.topologyModel.Init()
+					}
 					if section, ok := m.commandMap[cmd]; ok {
 						if section == "__quit__" {
 							return m, tea.Quit
@@ -631,6 +669,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.tabIndex = 0
 						return m, m.mainModel.Init()
 					}
+
 					// unknown command: clear input
 					m.commandBar.SetValue("")
 					// reset tab autocomplete state
@@ -701,6 +740,15 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.graphModel, cmd = m.graphModel.Update(msg)
 		return m, cmd
 	}
+	if m.state == stateTopology && m.topologyModel != nil {
+		var cmd tea.Cmd
+		var newModel tea.Model
+		newModel, cmd = m.topologyModel.Update(msg)
+		if tm, ok := newModel.(topology.TopologyModel); ok {
+			*m.topologyModel = tm
+		}
+		return m, cmd
+	}
 	if m.state == stateShell && m.shellModel != nil {
 		var cmd tea.Cmd
 		var newModel tea.Model
@@ -765,10 +813,49 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View implements tea.Model.
 func (m AppModel) View() string {
-	footer := fmt.Sprintf("\n[%s] Press : for command mode", m.state)
+	footer := fmt.Sprintf("\n[%s] Press : for command mode  [T] topology", m.state)
 	switch m.state {
 	case stateSidebar:
-		return "\n" + m.sidebar.View() + "\n" + footer
+		sidebarWidth := 36
+		rightWidth := m.width - sidebarWidth - 4
+		if rightWidth < 20 {
+			// Terminal too narrow: fallback to single column
+			return "\n" + m.sidebar.View() + "\n" + footer
+		}
+		sideStyle := lipgloss.NewStyle().
+			Width(sidebarWidth).
+			Height(m.height - 4).
+			BorderRight(true).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(lipgloss.Color("240"))
+		rightStyle := lipgloss.NewStyle().
+			Width(rightWidth).
+			Height(m.height - 4).
+			PaddingLeft(2).
+			PaddingTop(1)
+		help := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render
+		accent := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")).Render
+		rightContent := accent("Cloud: ") + m.cloudName + "\n\n" +
+			accent("Navigation") + "\n" +
+			help("  ↑/k  up          ↓/j  down") + "\n" +
+			help("  enter  open      esc  back") + "\n\n" +
+			accent("Global keys") + "\n" +
+			help("  ?   help         c   switch cloud") + "\n" +
+			help("  T   topology     :   command mode") + "\n" +
+			help("  g   graph        y   JSON view") + "\n" +
+			help("  i   inspect      l   logs (servers)") + "\n\n" +
+			accent("Commands") + "\n" +
+			help("  :servers  :networks  :volumes") + "\n" +
+			help("  :images   :limits    :dns") + "\n" +
+			help("  :routers  :ports     :fip") + "\n" +
+			help("  :topology / :topo") + "\n" +
+			help("  :!<cmd>  → openstack CLI") + "\n\n" +
+			lipgloss.NewStyle().Foreground(lipgloss.Color("238")).Render("ostui v0.1.0")
+		layout := lipgloss.JoinHorizontal(lipgloss.Top,
+			sideStyle.Render(m.sidebar.View()),
+			rightStyle.Render(rightContent),
+		)
+		return layout + "\n" + footer
 	case stateMain:
 		if m.mainModel != nil {
 			return m.mainModel.View() + footer
@@ -791,6 +878,11 @@ func (m AppModel) View() string {
 	case stateGraph:
 		if m.graphModel != nil {
 			return m.graphModel.View() + footer
+		}
+		return "" + footer
+	case stateTopology:
+		if m.topologyModel != nil {
+			return m.topologyModel.View() + footer
 		}
 		return "" + footer
 	case stateShell:

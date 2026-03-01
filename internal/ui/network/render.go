@@ -22,7 +22,7 @@ func RenderNetworks(nc client.NetworkClient) string {
 		table.WithColumns(cols),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(10),
+		table.WithHeight(20),
 	)
 	t.SetStyles(table.DefaultStyles())
 	return t.View()
@@ -43,7 +43,7 @@ func RenderSubnets(nc client.NetworkClient) string {
 		table.WithColumns(cols),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(10),
+		table.WithHeight(20),
 	)
 	t.SetStyles(table.DefaultStyles())
 	return t.View()
@@ -64,7 +64,7 @@ func RenderFloatingIPs(nc client.NetworkClient) string {
 		table.WithColumns(cols),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(10),
+		table.WithHeight(20),
 	)
 	t.SetStyles(table.DefaultStyles())
 	return t.View()
@@ -85,7 +85,7 @@ func RenderSecurityGroups(nc client.NetworkClient) string {
 		table.WithColumns(cols),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(10),
+		table.WithHeight(20),
 	)
 	t.SetStyles(table.DefaultStyles())
 	return t.View()

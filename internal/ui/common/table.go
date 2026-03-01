@@ -15,7 +15,7 @@ func NewTable(columns []table.Column, rows []table.Row) TableModel {
 		table.WithColumns(columns),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(10),
+		table.WithHeight(20),
 	)
 	// Apply a simple header style.
 	t.SetStyles(table.DefaultStyles()) // Use default styles

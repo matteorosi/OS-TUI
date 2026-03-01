@@ -17,6 +17,8 @@ type NetworksModel struct {
 	err        error
 	spinner    spinner.Model
 	client     client.NetworkClient
+	width      int
+	height     int
 	allRows    []table.Row
 	filterMode bool
 	filter     textinput.Model
@@ -28,7 +30,7 @@ func NewNetworksModel(nc client.NetworkClient) NetworksModel {
 	s.Spinner = spinner.Dot
 	ti := textinput.New()
 	ti.Placeholder = "filter..."
-	return NetworksModel{client: nc, loading: true, spinner: s, filter: ti}
+	return NetworksModel{client: nc, loading: true, spinner: s, filter: ti, width: 120, height: 30}
 }
 
 // dataLoadedMsg is sent when network data has been fetched.
@@ -54,7 +56,7 @@ func (m NetworksModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(10),
+			table.WithHeight(m.height-6),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return dataLoadedMsg{tbl: t, rows: rows}
@@ -71,10 +73,17 @@ func (m NetworksModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.table = msg.tbl
+		m.updateTableColumns()
+		m.table.SetHeight(m.height - 6)
 		m.allRows = msg.rows
 		return m, nil
 	case tea.WindowSizeMsg:
-		// No resizing needed.
+		m.width = msg.Width
+		m.height = msg.Height
+		if m.table.Columns() != nil {
+			m.table.SetHeight(m.height - 6)
+			m.updateTableColumns()
+		}
 		return m, nil
 	case tea.KeyMsg:
 		if m.loading || m.err != nil {
@@ -149,5 +158,16 @@ func (m NetworksModel) View() string {
 // Ensure NetworksModel implements tea.Model.
 // Table returns the underlying table model.
 func (m NetworksModel) Table() table.Model { return m.table }
+
+// updateTableColumns adjusts column widths based on the current width.
+func (m *NetworksModel) updateTableColumns() {
+	idW := 36
+	statusW := 12
+	nameW := m.width - idW - statusW - 6
+	if nameW < 10 {
+		nameW = 10
+	}
+	m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "Status", Width: statusW}})
+}
 
 var _ tea.Model = (*NetworksModel)(nil)

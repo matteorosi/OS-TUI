@@ -16,13 +16,17 @@ type ZonesModel struct {
 	err     error
 	spinner spinner.Model
 	client  client.ComputeClient
+	// Dynamic sizing
+	width  int
+	height int
 }
 
 // NewZonesModel creates a new ZonesModel.
 func NewZonesModel(cc client.ComputeClient) ZonesModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	return ZonesModel{client: cc, loading: true, spinner: s}
+	// Initialize with reasonable defaults.
+	return ZonesModel{client: cc, loading: true, spinner: s, width: 120, height: 30}
 }
 
 type zonesDataLoadedMsg struct {
@@ -37,6 +41,7 @@ func (m ZonesModel) Init() tea.Cmd {
 		if err != nil {
 			return zonesDataLoadedMsg{err: err}
 		}
+		// Define columns; Name will be resized dynamically.
 		cols := []table.Column{{Title: "Name", Width: 20}, {Title: "Available", Width: 10}}
 		rows := []table.Row{}
 		for _, z := range zones {
@@ -46,7 +51,7 @@ func (m ZonesModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(10),
+			table.WithHeight(m.height-6),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return zonesDataLoadedMsg{tbl: t}
@@ -63,8 +68,18 @@ func (m ZonesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.table = msg.tbl
+		// Adjust columns and height based on current dimensions.
+		m.updateTableColumns()
+		m.table.SetHeight(m.height - 6)
 		return m, nil
 	case tea.WindowSizeMsg:
+		// Update stored dimensions and adjust table.
+		m.width = msg.Width
+		m.height = msg.Height
+		if m.table.Columns() != nil {
+			m.table.SetHeight(m.height - 6)
+			m.updateTableColumns()
+		}
 		return m, nil
 	case tea.KeyMsg:
 		if m.loading || m.err != nil {
@@ -92,6 +107,18 @@ func (m ZonesModel) View() string {
 		return fmt.Sprintf("Error: %s", m.err)
 	}
 	return m.table.View()
+}
+
+// updateTableColumns adjusts column widths based on the current width.
+func (m *ZonesModel) updateTableColumns() {
+	// Fixed column widths.
+	availableW := 10
+	// Compute flexible name width.
+	nameW := m.width - availableW - 6
+	if nameW < 10 {
+		nameW = 10
+	}
+	m.table.SetColumns([]table.Column{{Title: "Name", Width: nameW}, {Title: "Available", Width: availableW}})
 }
 
 // Table returns the underlying table model.

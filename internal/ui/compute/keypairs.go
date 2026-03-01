@@ -6,7 +6,6 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-
 	"ostui/internal/client"
 	"strings"
 )
@@ -23,6 +22,10 @@ type KeypairsModel struct {
 	allRows    []table.Row
 	filterMode bool
 	filter     textinput.Model
+
+	// Dynamic sizing
+	width  int
+	height int
 }
 
 // NewKeypairsModel creates a new KeypairsModel with the given compute client.
@@ -31,7 +34,7 @@ func NewKeypairsModel(cc client.ComputeClient) KeypairsModel {
 	s.Spinner = spinner.Dot
 	ti := textinput.New()
 	ti.Placeholder = "filter..."
-	return KeypairsModel{client: cc, loading: true, spinner: s, filter: ti}
+	return KeypairsModel{client: cc, loading: true, spinner: s, filter: ti, width: 120, height: 30}
 }
 
 type keypairsDataLoadedMsg struct {
@@ -56,7 +59,7 @@ func (m KeypairsModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(10),
+			table.WithHeight(m.height-6),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return keypairsDataLoadedMsg{tbl: t, rows: rows}
@@ -75,9 +78,16 @@ func (m KeypairsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.table = msg.tbl
 		m.allRows = msg.rows
+		m.updateTableColumns()
+		m.table.SetHeight(m.height - 6)
 		return m, nil
 	case tea.WindowSizeMsg:
-		// No special resize handling needed.
+		m.width = msg.Width
+		m.height = msg.Height
+		if m.table.Columns() != nil {
+			m.table.SetHeight(m.height - 6)
+			m.updateTableColumns()
+		}
 		return m, nil
 	case tea.KeyMsg:
 		if m.loading || m.err != nil {
@@ -145,6 +155,19 @@ func (m KeypairsModel) View() string {
 		return fmt.Sprintf("%s\n%s\n%s", filterLine, m.table.View(), footer)
 	}
 	return m.table.View()
+}
+
+// updateTableColumns adjusts column widths based on the current width.
+func (m *KeypairsModel) updateTableColumns() {
+	fingerprintW := 30
+	typeW := 10
+	userIDW := 36
+	// Name column gets remaining space.
+	nameW := m.width - fingerprintW - typeW - userIDW - 6
+	if nameW < 10 {
+		nameW = 10
+	}
+	m.table.SetColumns([]table.Column{{Title: "Name", Width: nameW}, {Title: "Fingerprint", Width: fingerprintW}, {Title: "Type", Width: typeW}, {Title: "UserID", Width: userIDW}})
 }
 
 // Table returns the underlying table model for external callers.
