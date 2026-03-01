@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/hypervisors"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 	"time"
 )
 

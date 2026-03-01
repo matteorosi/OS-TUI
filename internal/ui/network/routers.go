@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 	"strings"
 )
 
@@ -70,7 +71,7 @@ func (m RouterModel) Init() tea.Cmd {
 		if err != nil {
 			return routersListMsg{err: err}
 		}
-		cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 20}, {Title: "Status", Width: 12}}
+		cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "Status", Width: uiconst.ColWidthStatus}}
 		rows := []table.Row{}
 		for _, r := range routers {
 			// The Router type is an alias for gophercloud's routers.Router which has a Status field.
@@ -81,7 +82,7 @@ func (m RouterModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return routersListMsg{tbl: t, rows: rows}
@@ -96,7 +97,7 @@ func (m RouterModel) loadInterfacesCmd(routerID string) tea.Cmd {
 			return routerIfacesMsg{err: err}
 		}
 		// Build a simple table: Interface ID and Subnet ID.
-		cols := []table.Column{{Title: "Interface ID", Width: 36}, {Title: "Subnet ID", Width: 36}}
+		cols := []table.Column{{Title: "Interface ID", Width: uiconst.ColWidthUUID}, {Title: "Subnet ID", Width: uiconst.ColWidthUUID}}
 		rows := []table.Row{}
 		for _, i := range ifaces {
 			rows = append(rows, table.Row{i.ID, i.NetworkID})
@@ -105,7 +106,7 @@ func (m RouterModel) loadInterfacesCmd(routerID string) tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return routerIfacesMsg{tbl: t}
@@ -123,7 +124,7 @@ func (m RouterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.table = msg.tbl
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - 6)
+		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 		m.allRows = msg.rows
 		return m, nil
 	case routerIfacesMsg:
@@ -140,7 +141,7 @@ func (m RouterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		if m.table.Columns() != nil {
-			m.table.SetHeight(m.height - 6)
+			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 			m.updateTableColumns()
 		}
 		return m, nil
@@ -249,9 +250,9 @@ func (m RouterModel) Table() table.Model { return m.table }
 
 // updateTableColumns adjusts column widths based on the current width.
 func (m *RouterModel) updateTableColumns() {
-	idW := 36
-	statusW := 12
-	nameW := m.width - idW - statusW - 6
+	idW := uiconst.ColWidthUUID
+	statusW := uiconst.ColWidthStatus
+	nameW := m.width - idW - statusW - uiconst.TableHeightOffset
 	if nameW < 10 {
 		nameW = 10
 	}

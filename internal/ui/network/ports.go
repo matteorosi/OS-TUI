@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 	"strings"
 )
 
@@ -70,7 +71,7 @@ func (m PortsModel) Init() tea.Cmd {
 		if err != nil {
 			return portsListMsg{err: err}
 		}
-		cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 20}, {Title: "Network ID", Width: 36}, {Title: "Status", Width: 12}}
+		cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "Network ID", Width: uiconst.ColWidthUUID}, {Title: "Status", Width: uiconst.ColWidthStatus}}
 		rows := []table.Row{}
 		for _, p := range ports {
 			rows = append(rows, table.Row{p.ID, p.Name, p.NetworkID, fmt.Sprintf("%v", p.Status)})
@@ -79,7 +80,7 @@ func (m PortsModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return portsListMsg{tbl: t, rows: rows}
@@ -93,7 +94,7 @@ func (m PortsModel) loadPortDetailCmd(portID string) tea.Cmd {
 		if err != nil {
 			return portDetailMsg{err: err}
 		}
-		cols := []table.Column{{Title: "Field", Width: 20}, {Title: "Value", Width: 60}}
+		cols := []table.Column{{Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValue}}
 		rows := []table.Row{{"ID", p.ID}, {"Name", p.Name}, {"Network ID", p.NetworkID}, {"Status", fmt.Sprintf("%v", p.Status)}, {"MAC Address", p.MACAddress}, {"Device ID", p.DeviceID}}
 		t := table.New(
 			table.WithColumns(cols),
@@ -117,7 +118,7 @@ func (m PortsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table = msg.tbl
 		m.allRows = msg.rows
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - 6)
+		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 		return m, nil
 	case portDetailMsg:
 		m.loading = false
@@ -133,7 +134,7 @@ func (m PortsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		if m.table.Columns() != nil {
-			m.table.SetHeight(m.height - 6)
+			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 			m.updateTableColumns()
 		}
 		return m, nil
@@ -258,10 +259,10 @@ func (m PortsModel) View() string {
 
 // updateTableColumns adjusts column widths based on the current width.
 func (m *PortsModel) updateTableColumns() {
-	idW := 36
-	netIDW := 36
-	statusW := 12
-	nameW := m.width - idW - netIDW - statusW - 6
+	idW := uiconst.ColWidthUUID
+	netIDW := uiconst.ColWidthUUID
+	statusW := uiconst.ColWidthStatus
+	nameW := m.width - idW - netIDW - statusW - uiconst.TableHeightOffset
 	if nameW < 10 {
 		nameW = 10
 	}

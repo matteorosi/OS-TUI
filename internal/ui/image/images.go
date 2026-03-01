@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 	"strings"
 )
 
@@ -49,7 +50,7 @@ func (m ImagesModel) Init() tea.Cmd {
 		if err != nil {
 			return imagesDataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 20}, {Title: "Status", Width: 12}}
+		cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "Status", Width: uiconst.ColWidthStatus}}
 		rows := []table.Row{}
 		for _, img := range imgList {
 			rows = append(rows, table.Row{img.ID, img.Name, img.Status})
@@ -58,7 +59,7 @@ func (m ImagesModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return imagesDataLoadedMsg{tbl: t, rows: rows}
@@ -159,10 +160,10 @@ func (m ImagesModel) View() string {
 
 // updateTableColumns adjusts column widths based on the current width.
 func (m *ImagesModel) updateTableColumns() {
-	idW := 36
-	statusW := 12
+	idW := uiconst.ColWidthUUID
+	statusW := uiconst.ColWidthStatus
 	// Compute flexible name width.
-	nameW := m.width - idW - statusW - 6
+	nameW := m.width - idW - statusW - uiconst.TableHeightOffset
 	if nameW < 10 {
 		nameW = 10
 	}
@@ -203,7 +204,7 @@ func (m ImageDetailModel) Init() tea.Cmd {
 		if err != nil {
 			return imageDetailDataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "Field", Width: 20}, {Title: "Value", Width: 60}}
+		cols := []table.Column{{Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValue}}
 		rows := []table.Row{{"ID", img.ID}, {"Name", img.Name}, {"Status", img.Status}, {"MinDisk (GB)", fmt.Sprintf("%d", img.MinDisk)}, {"MinRAM (MB)", fmt.Sprintf("%d", img.MinRAM)}, {"Created", img.Created}, {"Updated", img.Updated}}
 		t := table.New(
 			table.WithColumns(cols),

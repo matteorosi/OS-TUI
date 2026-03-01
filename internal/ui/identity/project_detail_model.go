@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 )
 
 type projectInfo struct {
@@ -75,7 +76,7 @@ func (m ProjectDetailModel) Init() tea.Cmd {
 		if proj == nil {
 			return projectDetailDataLoadedMsg{err: fmt.Errorf("project %s not found", m.projectID)}
 		}
-		cols := []table.Column{{Title: "Field", Width: 20}, {Title: "Value", Width: 30}, {Title: "Field", Width: 20}, {Title: "Value", Width: 30}}
+		cols := []table.Column{{Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValueShort}, {Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValueShort}}
 		rows := []table.Row{{"ID", proj.ID}, {"Name", proj.Name}, {"DomainID", proj.DomainID}, {"Enabled", fmt.Sprintf("%v", proj.Enabled)}}
 		half := (len(rows) + 1) / 2
 		newRows := []table.Row{}

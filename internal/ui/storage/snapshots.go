@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
 	"ostui/internal/ui/common"
+	"ostui/internal/ui/uiconst"
 )
 
 type SnapshotsModel struct {
@@ -38,7 +39,7 @@ func (m SnapshotsModel) Init() tea.Cmd {
 		if err != nil {
 			return snapshotsDataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 20}, {Title: "VolumeID", Width: 36}, {Title: "Size", Width: 6}, {Title: "Status", Width: 12}, {Title: "Created", Width: 20}}
+		cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "VolumeID", Width: uiconst.ColWidthUUID}, {Title: "Size", Width: uiconst.ColWidthProtocol}, {Title: "Status", Width: uiconst.ColWidthStatus}, {Title: "Created", Width: uiconst.ColWidthName}}
 		rows := []table.Row{}
 		for _, s := range snapList {
 			rows = append(rows, table.Row{s.ID, s.Name, s.VolumeID, fmt.Sprintf("%d", s.Size), s.Status, s.CreatedAt.Format("2006-01-02 15:04:05")})
@@ -47,7 +48,7 @@ func (m SnapshotsModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return snapshotsDataLoadedMsg{tbl: t}
@@ -65,13 +66,13 @@ func (m SnapshotsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.table = msg.tbl
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - 6)
+		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		if m.table.Columns() != nil {
-			m.table.SetHeight(m.height - 6)
+			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 			m.updateTableColumns()
 		}
 		return m, nil
@@ -98,7 +99,7 @@ func (m SnapshotsModel) View() string {
 		return m.spinner.View()
 	}
 	if m.err != nil {
-		cols := []table.Column{{Title: "Error", Width: 80}}
+		cols := []table.Column{{Title: "Error", Width: uiconst.ColWidthError}}
 		rows := []table.Row{{"Failed to list snapshots: " + m.err.Error()}}
 		return common.NewTable(cols, rows).View()
 	}
@@ -109,10 +110,10 @@ func (m SnapshotsModel) View() string {
 func (m SnapshotsModel) Table() table.Model { return m.table }
 
 func (m *SnapshotsModel) updateTableColumns() {
-	idW := 36
-	volIDW := 36
-	sizeW := 6
-	statusW := 12
+	idW := uiconst.ColWidthUUID
+	volIDW := uiconst.ColWidthUUID
+	sizeW := uiconst.ColWidthProtocol
+	statusW := uiconst.ColWidthStatus
 	remaining := m.width - idW - volIDW - sizeW - statusW - 6
 	if remaining < 20 {
 		remaining = 20

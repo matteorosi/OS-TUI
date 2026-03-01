@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 	"strings"
 )
 
@@ -47,7 +48,7 @@ func (m RecordSetsModel) Init() tea.Cmd {
 		if err != nil {
 			return recordSetsDataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "Name", Width: 40}, {Title: "Type", Width: 8}, {Title: "TTL", Width: 8}, {Title: "Status", Width: 12}, {Title: "Records", Width: 30}}
+		cols := []table.Column{{Title: "Name", Width: uiconst.ColWidthNameDNS}, {Title: "Type", Width: uiconst.ColWidthType}, {Title: "TTL", Width: uiconst.ColWidthTTL}, {Title: "Status", Width: uiconst.ColWidthStatus}, {Title: "Records", Width: uiconst.ColWidthRecords}}
 		rows := []table.Row{}
 		for _, r := range rs {
 			records := strings.Join(r.Records, ",")

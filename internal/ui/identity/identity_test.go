@@ -2,6 +2,7 @@ package identity
 
 import (
 	"errors"
+	"ostui/internal/ui/uiconst"
 	"strings"
 	"testing"
 	"time"
@@ -43,12 +44,12 @@ func (m *mockIdentityClient) GetTokenInfo() (*tokens.Token, error) {
 
 // Helper to create a table model for projects.
 func newProjectsTable(rows []table.Row) table.Model {
-	cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 20}, {Title: "Domain ID", Width: 20}}
+	cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "Domain ID", Width: uiconst.ColWidthName}}
 	t := table.New(
 		table.WithColumns(cols),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(10),
+		table.WithHeight(uiconst.TableHeightDefault),
 	)
 	t.SetStyles(table.DefaultStyles())
 	return t
@@ -56,12 +57,12 @@ func newProjectsTable(rows []table.Row) table.Model {
 
 // Helper to create a table model for users.
 func newUsersTable(rows []table.Row) table.Model {
-	cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 20}, {Title: "Domain ID", Width: 20}, {Title: "Enabled", Width: 8}}
+	cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "Domain ID", Width: uiconst.ColWidthName}, {Title: "Enabled", Width: uiconst.ColWidthEnabled}}
 	t := table.New(
 		table.WithColumns(cols),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(10),
+		table.WithHeight(uiconst.TableHeightDefault),
 	)
 	t.SetStyles(table.DefaultStyles())
 	return t

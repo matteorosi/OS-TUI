@@ -179,6 +179,32 @@ func NewModel(provider *gophercloud.ProviderClient, cloudName string, compute cl
 	return AppModel{provider: provider, cloudName: cloudName, computeClient: compute, networkClient: network, storageClient: storage, identityClient: identity, imageClient: image, limitsClient: limits, dnsClient: dns, lbClient: lb, sidebar: l, state: stateSidebar, prevState: "", commandBar: cmdBar, commandMap: cmdMap}
 }
 
+// navigationMap returns a map of sidebar titles to model constructors.
+func (m AppModel) navigationMap() map[string]func() tea.Model {
+	return map[string]func() tea.Model{
+		"Servers":            func() tea.Model { return compute.NewInstancesModel(m.computeClient) },
+		"Networks":           func() tea.Model { return network.NewNetworksModel(m.networkClient) },
+		"Floating IPs":       func() tea.Model { return network.NewFloatingIPsModel(m.networkClient) },
+		"Security Groups":    func() tea.Model { return network.NewSecurityGroupsModel(m.networkClient) },
+		"Routers":            func() tea.Model { return network.NewRoutersModel(m.networkClient) },
+		"Ports":              func() tea.Model { return network.NewPortsModel(m.networkClient) },
+		"Volumes":            func() tea.Model { return storage.NewVolumesModel(m.storageClient) },
+		"Projects":           func() tea.Model { return identity.NewProjectsModel(m.identityClient) },
+		"Users":              func() tea.Model { return identity.NewUsersModel(m.identityClient) },
+		"Token":              func() tea.Model { return identity.NewTokenModel(m.identityClient) },
+		"Images":             func() tea.Model { return image.NewImagesModel(m.imageClient) },
+		"Limits":             func() tea.Model { return compute.NewLimitsModel(m.limitsClient) },
+		"Hypervisors":        func() tea.Model { return compute.NewHypervisorsModel(m.computeClient) },
+		"Availability Zones": func() tea.Model { return compute.NewZonesModel(m.computeClient) },
+		"Subnets":            func() tea.Model { return network.NewSubnetsModel(m.networkClient) },
+		"Flavors":            func() tea.Model { return compute.NewFlavorsModel(m.computeClient) },
+		"Keypairs":           func() tea.Model { return compute.NewKeypairsModel(m.computeClient) },
+		"Zones":              func() tea.Model { return dns.NewZonesModel(m.dnsClient) },
+		"Load Balancers":     func() tea.Model { return loadbalancer.NewLoadBalancersModel(m.lbClient) },
+		"Topology":           func() tea.Model { return topology.NewTopologyModel(m.computeClient, m.networkClient, m.storageClient) },
+	}
+}
+
 // Init implements tea.Model.
 func (m AppModel) Init() tea.Cmd {
 	return tea.EnterAltScreen
@@ -186,50 +212,20 @@ func (m AppModel) Init() tea.Cmd {
 
 // navigateTo instantiates the appropriate submodel based on the given section title.
 func (m *AppModel) navigateTo(section string) {
-	switch section {
-	case "Servers":
-		m.mainModel = compute.NewInstancesModel(m.computeClient)
-	case "Networks":
-		m.mainModel = network.NewNetworksModel(m.networkClient)
-	case "Floating IPs":
-		m.mainModel = network.NewFloatingIPsModel(m.networkClient)
-	case "Security Groups":
-		m.mainModel = network.NewSecurityGroupsModel(m.networkClient)
-	case "Volumes":
-		m.mainModel = storage.NewVolumesModel(m.storageClient)
-	case "Snapshots":
-		m.mainModel = storage.NewSnapshotsModel(m.storageClient)
-	case "Projects":
-		m.mainModel = identity.NewProjectsModel(m.identityClient)
-	case "Users":
-		m.mainModel = identity.NewUsersModel(m.identityClient)
-	case "Token":
-		m.mainModel = identity.NewTokenModel(m.identityClient)
-	case "Images":
-		m.mainModel = image.NewImagesModel(m.imageClient)
-	case "Limits":
-		m.mainModel = compute.NewLimitsModel(m.limitsClient)
-	case "Hypervisors":
-		m.mainModel = compute.NewHypervisorsModel(m.computeClient)
-	case "Availability Zones":
-		m.mainModel = compute.NewZonesModel(m.computeClient)
-	case "Subnets":
-		m.mainModel = network.NewSubnetsModel(m.networkClient)
-	case "Flavors":
-		m.mainModel = compute.NewFlavorsModel(m.computeClient)
-	case "Keypairs":
-		m.mainModel = compute.NewKeypairsModel(m.computeClient)
-	case "Zones":
-		m.mainModel = dns.NewZonesModel(m.dnsClient)
-	case "Load Balancers":
-		m.mainModel = loadbalancer.NewLoadBalancersModel(m.lbClient)
-	case "Topology":
-		tm := topology.NewTopologyModel(m.computeClient, m.networkClient, m.storageClient)
-		m.topologyModel = &tm
-		m.state = stateTopology
-	default:
-		// No submodel for unknown sections.
+	// Use navigationMap for most sections.
+	navMap := m.navigationMap()
+	if constructor, ok := navMap[section]; ok {
+		// Special handling for Topology which uses a dedicated model and state.
+		if section == "Topology" {
+			tm := topology.NewTopologyModel(m.computeClient, m.networkClient, m.storageClient)
+			m.topologyModel = &tm
+			m.state = stateTopology
+			return
+		}
+		m.mainModel = constructor()
+		return
 	}
+	// No submodel for unknown sections.
 }
 
 // Update implements tea.Model.
@@ -377,48 +373,16 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.selectedItem = i
 					// Transition to the main view and initialise the appropriate submodel.
 					m.state = stateMain
-					switch i.title {
-					case "Servers":
-						m.mainModel = compute.NewInstancesModel(m.computeClient)
-					case "Networks":
-						m.mainModel = network.NewNetworksModel(m.networkClient)
-					case "Floating IPs":
-						m.mainModel = network.NewFloatingIPsModel(m.networkClient)
-					case "Security Groups":
-						m.mainModel = network.NewSecurityGroupsModel(m.networkClient)
-					case "Routers":
-						m.mainModel = network.NewRoutersModel(m.networkClient)
-					case "Ports":
-						m.mainModel = network.NewPortsModel(m.networkClient)
-					case "Volumes":
-						m.mainModel = storage.NewVolumesModel(m.storageClient)
-					case "Projects":
-						m.mainModel = identity.NewProjectsModel(m.identityClient)
-					case "Token":
-						m.mainModel = identity.NewTokenModel(m.identityClient)
-					case "Users":
-						m.mainModel = identity.NewUsersModel(m.identityClient)
-					case "Images":
-						m.mainModel = image.NewImagesModel(m.imageClient)
-					case "Limits":
-						m.mainModel = compute.NewLimitsModel(m.limitsClient)
-					case "Hypervisors":
-						m.mainModel = compute.NewHypervisorsModel(m.computeClient)
-					case "Availability Zones":
-						m.mainModel = compute.NewZonesModel(m.computeClient)
-					case "Flavors":
-						m.mainModel = compute.NewFlavorsModel(m.computeClient)
-					case "Keypairs":
-						m.mainModel = compute.NewKeypairsModel(m.computeClient)
-					case "Zones":
-						m.mainModel = dns.NewZonesModel(m.dnsClient)
-					case "Load Balancers":
-						m.mainModel = loadbalancer.NewLoadBalancersModel(m.lbClient)
-					case "Topology":
-						tm := topology.NewTopologyModel(m.computeClient, m.networkClient, m.storageClient)
-						m.topologyModel = &tm
-						m.state = stateTopology
-					default:
+					navMap := m.navigationMap()
+					if constructor, ok := navMap[i.title]; ok {
+						if i.title == "Topology" {
+							// Use navigateTo for Topology to handle state and model.
+							m.navigateTo(i.title)
+						} else {
+							m.mainModel = constructor()
+							m.state = stateMain
+						}
+					} else {
 						// Fallback: no submodel – keep nil.
 					}
 
@@ -645,22 +609,34 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, m.shellModel.Init()
 					}
 					if cmd == "topology" || cmd == "topo" {
-						// Open topology view directly
-						tm := topology.NewTopologyModel(m.computeClient, m.networkClient, m.storageClient)
-						m.topologyModel = &tm
-						m.state = stateTopology
+						// Open topology view using navigateTo
+						m.navigateTo("Topology")
 						m.commandBar.SetValue("")
 						m.commandBar.Blur()
 						// reset tab autocomplete state
 						m.tabMatches = nil
 						m.tabIndex = 0
-						return m, m.topologyModel.Init()
+						if m.topologyModel != nil {
+							return m, m.topologyModel.Init()
+						}
+						return m, nil
 					}
 					if section, ok := m.commandMap[cmd]; ok {
 						if section == "__quit__" {
 							return m, tea.Quit
 						}
 						m.navigateTo(section)
+						if section == "Topology" {
+							m.commandBar.SetValue("")
+							m.commandBar.Blur()
+							// reset tab autocomplete state
+							m.tabMatches = nil
+							m.tabIndex = 0
+							if m.topologyModel != nil {
+								return m, m.topologyModel.Init()
+							}
+							return m, nil
+						}
 						m.state = stateMain
 						m.commandBar.SetValue("")
 						m.commandBar.Blur()

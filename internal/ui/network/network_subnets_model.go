@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 	"strings"
 )
 
@@ -53,7 +54,7 @@ func (m NetworkSubnetsModel) Init() tea.Cmd {
 			return networkSubnetsDataLoadedMsg{err: err}
 		}
 		// Filter subnets belonging to the network.
-		cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 20}, {Title: "CIDR", Width: 20}, {Title: "IPVer", Width: 6}}
+		cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "CIDR", Width: uiconst.ColWidthCIDR}, {Title: "IPVer", Width: uiconst.ColWidthIPVersion}}
 		rows := []table.Row{}
 		for _, s := range subList {
 			if s.NetworkID == m.networkID {
@@ -64,7 +65,7 @@ func (m NetworkSubnetsModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return networkSubnetsDataLoadedMsg{tbl: t, rows: rows}
@@ -90,7 +91,7 @@ func (m NetworkSubnetsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		if !m.loading {
 			m.updateTableColumns()
-			m.table.SetHeight(m.height - 6)
+			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 		}
 		return m, nil
 	case tea.KeyMsg:
@@ -151,7 +152,7 @@ func (m NetworkSubnetsModel) View() string {
 		return m.spinner.View()
 	}
 	if m.err != nil {
-		cols := []table.Column{{Title: "Error", Width: 80}}
+		cols := []table.Column{{Title: "Error", Width: uiconst.ColWidthError}}
 		rows := []table.Row{{"Failed to list subnets: " + m.err.Error()}}
 		return table.New(table.WithColumns(cols), table.WithRows(rows)).View()
 	}
@@ -164,9 +165,9 @@ func (m NetworkSubnetsModel) Table() table.Model { return m.table }
 func (m *NetworkSubnetsModel) updateTableColumns() {
 	if len(m.table.Columns()) > 0 {
 		// Fixed widths
-		idW := 36
-		cidrW := 20
-		ipverW := 6
+		idW := uiconst.ColWidthUUID
+		cidrW := uiconst.ColWidthCIDR
+		ipverW := uiconst.ColWidthIPVersion
 		// Remaining width for Name column
 		nameW := m.width - idW - cidrW - ipverW - 6
 		if nameW < 10 {

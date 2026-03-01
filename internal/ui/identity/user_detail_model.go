@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 )
 
 type userInfo struct {
@@ -79,7 +80,7 @@ func (m UserDetailModel) Init() tea.Cmd {
 		if user == nil {
 			return userDetailDataLoadedMsg{err: fmt.Errorf("user %s not found", m.userID)}
 		}
-		cols := []table.Column{{Title: "Field", Width: 20}, {Title: "Value", Width: 30}, {Title: "Field", Width: 20}, {Title: "Value", Width: 30}}
+		cols := []table.Column{{Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValueShort}, {Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValueShort}}
 		rows := []table.Row{{"ID", user.ID}, {"Name", user.Name}, {"Email", user.Email}, {"DomainID", user.DomainID}, {"Enabled", fmt.Sprintf("%v", user.Enabled)}}
 		half := (len(rows) + 1) / 2
 		newRows := []table.Row{}

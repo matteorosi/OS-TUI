@@ -14,6 +14,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 )
 
 // InstanceDetailModel displays detailed information for a single compute instance.
@@ -80,7 +81,7 @@ func (m InstanceDetailModel) Init() tea.Cmd {
 			return instanceDetailDataLoadedMsg{err: err}
 		}
 		// Build a two‑column table: split fields into two columns.
-		cols := []table.Column{{Title: "Field", Width: 20}, {Title: "Value", Width: 30}, {Title: "Field", Width: 20}, {Title: "Value", Width: 30}}
+		cols := []table.Column{{Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValueShort}, {Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValueShort}}
 		rows := []table.Row{{"ID", srv.ID}, {"Name", srv.Name}, {"Status", srv.Status}, {"Flavor", fmt.Sprintf("%v", srv.Flavor["id"])}, {"Image", fmt.Sprintf("%v", srv.Image["id"])}, {"Created", srv.Created.Format(time.RFC3339)}, {"Updated", srv.Updated.Format(time.RFC3339)}, {"HostID", srv.HostID}, {"KeyName", srv.KeyName}, {"UserID", srv.UserID}, {"TenantID", srv.TenantID}}
 		half := (len(rows) + 1) / 2
 		newRows := []table.Row{}

@@ -3,6 +3,7 @@ package common
 import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
+	"ostui/internal/ui/uiconst"
 )
 
 type TableModel struct {
@@ -15,7 +16,7 @@ func NewTable(columns []table.Column, rows []table.Row) TableModel {
 		table.WithColumns(columns),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(20),
+		table.WithHeight(uiconst.TableHeightDefault),
 	)
 	// Apply a simple header style.
 	t.SetStyles(table.DefaultStyles()) // Use default styles

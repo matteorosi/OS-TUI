@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 )
 
 type floatingIPInfo struct {
@@ -85,7 +86,7 @@ func (m FloatingIPDetailModel) Init() tea.Cmd {
 		if fip == nil {
 			return floatingIPDetailDataLoadedMsg{err: fmt.Errorf("floating IP %s not found", m.fipID)}
 		}
-		cols := []table.Column{{Title: "Field", Width: 20}, {Title: "Value", Width: 30}, {Title: "Field", Width: 20}, {Title: "Value", Width: 30}}
+		cols := []table.Column{{Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValueShort}, {Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValueShort}}
 		rows := []table.Row{{"ID", fip.ID}, {"FloatingNetworkID", fip.FloatingNetworkID}, {"FixedIP", fip.FixedIP}, {"PortID", fip.PortID}, {"Status", fip.Status}}
 		half := (len(rows) + 1) / 2
 		newRows := []table.Row{}

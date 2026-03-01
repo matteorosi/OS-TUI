@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 	"strings"
 )
 
@@ -36,7 +37,6 @@ func NewInstancesModel(cc client.ComputeClient) InstancesModel {
 	return InstancesModel{client: cc, loading: true, spinner: s, filter: ti, width: 120, height: 30}
 }
 
-// dataLoadedMsg is sent when instance data has been fetched.
 type dataLoadedMsg struct {
 	tbl  table.Model
 	rows []table.Row
@@ -50,7 +50,7 @@ func (m InstancesModel) Init() tea.Cmd {
 		if err != nil {
 			return dataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 20}, {Title: "Status", Width: 12}}
+		cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "Status", Width: uiconst.ColWidthStatus}}
 		rows := []table.Row{}
 		for _, s := range srvList {
 			rows = append(rows, table.Row{s.ID, s.Name, s.Status})
@@ -59,7 +59,7 @@ func (m InstancesModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return dataLoadedMsg{tbl: t, rows: rows}
@@ -78,13 +78,13 @@ func (m InstancesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table = msg.tbl
 		m.allRows = msg.rows
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - 6)
+		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		if m.table.Columns() != nil {
-			m.table.SetHeight(m.height - 6)
+			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 			m.updateTableColumns()
 		}
 		return m, nil
@@ -160,9 +160,9 @@ func (m InstancesModel) View() string {
 
 // updateTableColumns adjusts column widths based on the current width.
 func (m *InstancesModel) updateTableColumns() {
-	idW := 36
-	statusW := 12
-	nameW := m.width - idW - statusW - 6
+	idW := uiconst.ColWidthUUID
+	statusW := uiconst.ColWidthStatus
+	nameW := m.width - idW - statusW - uiconst.TableHeightOffset
 	if nameW < 10 {
 		nameW = 10
 	}
@@ -170,7 +170,6 @@ func (m *InstancesModel) updateTableColumns() {
 }
 
 // Ensure InstancesModel implements tea.Model.
-// Table returns the underlying table model.
 func (m InstancesModel) Table() table.Model { return m.table }
 
 var _ tea.Model = (*InstancesModel)(nil)

@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 	"strings"
 )
 
@@ -51,7 +52,7 @@ func (m ZonesModel) Init() tea.Cmd {
 		if err != nil {
 			return zonesDataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 40}, {Title: "Status", Width: 12}, {Title: "TTL", Width: 8}}
+		cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthNameDNS}, {Title: "Status", Width: uiconst.ColWidthStatus}, {Title: "TTL", Width: uiconst.ColWidthTTL}}
 		rows := []table.Row{}
 		for _, z := range zones {
 			rows = append(rows, table.Row{z.ID, z.Name, z.Status, fmt.Sprintf("%d", z.TTL)})
@@ -60,7 +61,7 @@ func (m ZonesModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return zonesDataLoadedMsg{tbl: t, rows: rows}
@@ -79,14 +80,14 @@ func (m ZonesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table = msg.tbl
 		m.allRows = msg.rows
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - 6)
+		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		if !m.loading {
 			m.updateTableColumns()
-			m.table.SetHeight(m.height - 6)
+			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 		}
 		return m, nil
 	case tea.KeyMsg:
@@ -196,9 +197,9 @@ func (m ZonesModel) Table() table.Model { return m.table }
 
 func (m *ZonesModel) updateTableColumns() {
 	if len(m.table.Columns()) > 0 {
-		idW := 36
-		statusW := 12
-		ttlW := 8
+		idW := uiconst.ColWidthUUID
+		statusW := uiconst.ColWidthStatus
+		ttlW := uiconst.ColWidthTTL
 		nameW := m.width - idW - statusW - ttlW - 6
 		if nameW < 10 {
 			nameW = 10

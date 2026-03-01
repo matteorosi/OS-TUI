@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 )
 
 type SnapshotDetailModel struct {
@@ -58,7 +59,7 @@ func (m SnapshotDetailModel) Init() tea.Cmd {
 		if snap == nil {
 			return snapshotDetailDataLoadedMsg{err: fmt.Errorf("snapshot %s not found", m.snapshotID)}
 		}
-		cols := []table.Column{{Title: "Field", Width: 20}, {Title: "Value", Width: 30}, {Title: "Field", Width: 20}, {Title: "Value", Width: 30}}
+		cols := []table.Column{{Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValueShort}, {Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValueShort}}
 		rows := []table.Row{{"ID", snap.ID}, {"Name", snap.Name}, {"VolumeID", snap.VolumeID}, {"Size", fmt.Sprintf("%d", snap.Size)}, {"Status", snap.Status}, {"CreatedAt", snap.CreatedAt.Format("2006-01-02 15:04:05")}}
 		half := (len(rows) + 1) / 2
 		newRows := []table.Row{}
@@ -191,7 +192,7 @@ func (m SnapshotDetailModel) View() string {
 		return fmt.Sprintf("%s\nPress 'y' or 'esc' to close", m.jsonViewport.View())
 	}
 	if m.err != nil {
-		cols := []table.Column{{Title: "Error", Width: 80}}
+		cols := []table.Column{{Title: "Error", Width: uiconst.ColWidthError}}
 		rows := []table.Row{{"Failed to load snapshot: " + m.err.Error()}}
 		return table.New(table.WithColumns(cols), table.WithRows(rows)).View()
 	}

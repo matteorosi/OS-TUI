@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 )
 
 // RouterDetailModel displays detailed information for a single router.
@@ -44,7 +45,7 @@ func (m RouterDetailModel) Init() tea.Cmd {
 		if r != nil {
 			external = r.GatewayInfo.NetworkID
 		}
-		cols := []table.Column{{Title: "Field", Width: 20}, {Title: "Value", Width: 60}}
+		cols := []table.Column{{Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValue}}
 		rows := []table.Row{{"ID", r.ID}, {"Name", r.Name}, {"Status", fmt.Sprintf("%v", r.Status)}, {"AdminStateUp", fmt.Sprintf("%v", r.AdminStateUp)}, {"ExternalGateway", external}}
 		t := table.New(
 			table.WithColumns(cols),

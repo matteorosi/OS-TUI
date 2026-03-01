@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 	"strings"
 )
 
@@ -50,7 +51,7 @@ func (m HypervisorsModel) Init() tea.Cmd {
 			return hypervisorsDataLoadedMsg{err: err}
 		}
 		// Define a concise set of columns.
-		cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Hostname", Width: 20}, {Title: "State", Width: 6}, {Title: "Status", Width: 8}, {Title: "VCPUs", Width: 6}, {Title: "VCPUs Used", Width: 10}, {Title: "RAM MB", Width: 8}, {Title: "RAM Used", Width: 9}, {Title: "Disk GB", Width: 8}, {Title: "Disk Used", Width: 9}}
+		cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Hostname", Width: uiconst.ColWidthName}, {Title: "State", Width: uiconst.ColWidthProtocol}, {Title: "Status", Width: uiconst.ColWidthEnabled}, {Title: "VCPUs", Width: uiconst.ColWidthProtocol}, {Title: "VCPUs Used", Width: uiconst.ColWidthType}, {Title: "RAM MB", Width: uiconst.ColWidthEnabled}, {Title: "RAM Used", Width: uiconst.ColWidthRAMUsed}, {Title: "Disk GB", Width: uiconst.ColWidthEnabled}, {Title: "Disk Used", Width: uiconst.ColWidthRAMUsed}}
 		rows := []table.Row{}
 		for _, hv := range hvList {
 			rows = append(rows, table.Row{hv.ID, hv.HypervisorHostname, hv.State, hv.Status, fmt.Sprintf("%d", hv.VCPUs), fmt.Sprintf("%d", hv.VCPUsUsed), fmt.Sprintf("%d", hv.MemoryMB), fmt.Sprintf("%d", hv.MemoryMBUsed), fmt.Sprintf("%d", hv.LocalGB), fmt.Sprintf("%d", hv.LocalGBUsed)})
@@ -59,7 +60,7 @@ func (m HypervisorsModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return hypervisorsDataLoadedMsg{tbl: t, rows: rows}
@@ -79,14 +80,14 @@ func (m HypervisorsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.allRows = msg.rows
 		// Adjust columns and height based on current dimensions.
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - 6)
+		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 		return m, nil
 	case tea.WindowSizeMsg:
 		// Update stored dimensions and adjust table.
 		m.width = msg.Width
 		m.height = msg.Height
 		if m.table.Columns() != nil {
-			m.table.SetHeight(m.height - 6)
+			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 			m.updateTableColumns()
 		}
 		return m, nil
@@ -152,18 +153,18 @@ func (m HypervisorsModel) View() string {
 
 // updateTableColumns adjusts column widths based on the current width.
 func (m *HypervisorsModel) updateTableColumns() {
-	idW := 36
+	idW := uiconst.ColWidthUUID
 	// Fixed column widths.
-	stateW := 6
-	statusW := 8
-	vcpusW := 6
-	vcpusUsedW := 10
-	ramW := 8
-	ramUsedW := 9
-	diskW := 8
-	diskUsedW := 9
+	stateW := uiconst.ColWidthProtocol
+	statusW := uiconst.ColWidthEnabled
+	vcpusW := uiconst.ColWidthProtocol
+	vcpusUsedW := uiconst.ColWidthType
+	ramW := uiconst.ColWidthEnabled
+	ramUsedW := uiconst.ColWidthRAMUsed
+	diskW := uiconst.ColWidthEnabled
+	diskUsedW := uiconst.ColWidthDiskUsed
 	// Compute flexible hostname width.
-	fixedTotal := idW + stateW + statusW + vcpusW + vcpusUsedW + ramW + ramUsedW + diskW + diskUsedW + 6 // margin
+	fixedTotal := idW + stateW + statusW + vcpusW + vcpusUsedW + ramW + ramUsedW + diskW + diskUsedW + uiconst.TableHeightOffset // margin
 	hostnameW := m.width - fixedTotal
 	if hostnameW < 10 {
 		hostnameW = 10

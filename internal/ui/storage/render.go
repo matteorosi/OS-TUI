@@ -5,6 +5,7 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	"ostui/internal/client"
 	"ostui/internal/ui/common"
+	"ostui/internal/ui/uiconst"
 )
 
 // RenderVolumes returns a string representation of the list of storage volumes.
@@ -13,7 +14,7 @@ func RenderVolumes(sc client.StorageClient) string {
 	if err != nil {
 		return fmt.Sprintf("Failed to list volumes: %s", err)
 	}
-	cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 20}, {Title: "Size", Width: 8}, {Title: "Status", Width: 12}}
+	cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "Size", Width: uiconst.ColWidthSize}, {Title: "Status", Width: uiconst.ColWidthStatus}}
 	rows := []table.Row{}
 	for _, v := range volList {
 		rows = append(rows, table.Row{v.ID, v.Name, fmt.Sprintf("%d", v.Size), v.Status})
@@ -22,7 +23,7 @@ func RenderVolumes(sc client.StorageClient) string {
 		table.WithColumns(cols),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(20),
+		table.WithHeight(uiconst.TableHeightDefault),
 	)
 	t.SetStyles(table.DefaultStyles())
 	return t.View()
@@ -50,7 +51,7 @@ func RenderSnapshots(sc client.StorageClient) string {
 	if err != nil {
 		return fmt.Sprintf("Failed to list snapshots: %s", err)
 	}
-	cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 20}, {Title: "VolumeID", Width: 36}, {Title: "Size", Width: 8}, {Title: "Status", Width: 12}, {Title: "Created", Width: 20}}
+	cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "VolumeID", Width: uiconst.ColWidthUUID}, {Title: "Size", Width: uiconst.ColWidthSize}, {Title: "Status", Width: uiconst.ColWidthStatus}, {Title: "Created", Width: uiconst.ColWidthField}}
 	rows := []table.Row{}
 	for _, snap := range snapList {
 		rows = append(rows, table.Row{snap.ID, snap.Name, snap.VolumeID, fmt.Sprintf("%d", snap.Size), snap.Status, snap.CreatedAt.Format("2006-01-02 15:04:05")})
@@ -59,7 +60,7 @@ func RenderSnapshots(sc client.StorageClient) string {
 		table.WithColumns(cols),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(20),
+		table.WithHeight(uiconst.TableHeightDefault),
 	)
 	t.SetStyles(table.DefaultStyles())
 	return t.View()
@@ -71,7 +72,7 @@ func RenderBuckets(osc client.ObjectStorageClient) string {
 	if err != nil {
 		return fmt.Sprintf("Failed to list buckets: %s", err)
 	}
-	cols := []table.Column{{Title: "Name", Width: 20}, {Title: "Count", Width: 8}, {Title: "Bytes", Width: 12}}
+	cols := []table.Column{{Title: "Name", Width: uiconst.ColWidthName}, {Title: "Count", Width: uiconst.ColWidthSize}, {Title: "Bytes", Width: uiconst.ColWidthStatus}}
 	rows := []table.Row{}
 	for _, b := range bucketList {
 		rows = append(rows, table.Row{b.Name, fmt.Sprintf("%d", b.Count), fmt.Sprintf("%d", b.Bytes)})
@@ -80,7 +81,7 @@ func RenderBuckets(osc client.ObjectStorageClient) string {
 		table.WithColumns(cols),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(20),
+		table.WithHeight(uiconst.TableHeightDefault),
 	)
 	t.SetStyles(table.DefaultStyles())
 	return t.View()

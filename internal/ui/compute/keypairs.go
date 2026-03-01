@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 	"strings"
 )
 
@@ -50,7 +51,7 @@ func (m KeypairsModel) Init() tea.Cmd {
 		if err != nil {
 			return keypairsDataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "Name", Width: 20}, {Title: "Fingerprint", Width: 30}, {Title: "Type", Width: 10}, {Title: "UserID", Width: 36}}
+		cols := []table.Column{{Title: "Name", Width: uiconst.ColWidthName}, {Title: "Fingerprint", Width: uiconst.ColWidthFingerprint}, {Title: "Type", Width: uiconst.ColWidthType}, {Title: "UserID", Width: uiconst.ColWidthUUID}}
 		rows := []table.Row{}
 		for _, kp := range kpList {
 			rows = append(rows, table.Row{kp.Name, kp.Fingerprint, kp.Type, kp.UserID})
@@ -59,7 +60,7 @@ func (m KeypairsModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return keypairsDataLoadedMsg{tbl: t, rows: rows}
@@ -79,13 +80,13 @@ func (m KeypairsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table = msg.tbl
 		m.allRows = msg.rows
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - 6)
+		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		if m.table.Columns() != nil {
-			m.table.SetHeight(m.height - 6)
+			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 			m.updateTableColumns()
 		}
 		return m, nil
@@ -159,7 +160,7 @@ func (m KeypairsModel) View() string {
 
 // updateTableColumns adjusts column widths based on the current width.
 func (m *KeypairsModel) updateTableColumns() {
-	fingerprintW := 30
+	fingerprintW := uiconst.ColWidthFingerprint
 	typeW := 10
 	userIDW := 36
 	// Name column gets remaining space.

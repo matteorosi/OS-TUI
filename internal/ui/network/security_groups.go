@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
 	"ostui/internal/ui/common"
+	"ostui/internal/ui/uiconst"
 	"strings"
 )
 
@@ -48,7 +49,7 @@ func (m SecurityGroupsModel) Init() tea.Cmd {
 		if err != nil {
 			return securityGroupsDataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 20}, {Title: "Description", Width: 30}, {Title: "Stateful", Width: 8}}
+		cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "Description", Width: uiconst.ColWidthDescription}, {Title: "Stateful", Width: uiconst.ColWidthStateful}}
 		rows := []table.Row{}
 		for _, sg := range sgList {
 			rows = append(rows, table.Row{sg.ID, sg.Name, sg.Description, fmt.Sprintf("%v", sg.Stateful)})
@@ -57,7 +58,7 @@ func (m SecurityGroupsModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return securityGroupsDataLoadedMsg{tbl: t, rows: rows}
@@ -76,13 +77,13 @@ func (m SecurityGroupsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table = msg.tbl
 		m.allRows = msg.rows
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - 6)
+		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		if m.table.Columns() != nil {
-			m.table.SetHeight(m.height - 6)
+			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 			m.updateTableColumns()
 		}
 		return m, nil
@@ -144,7 +145,7 @@ func (m SecurityGroupsModel) View() string {
 		return m.spinner.View()
 	}
 	if m.err != nil {
-		cols := []table.Column{{Title: "Error", Width: 80}}
+		cols := []table.Column{{Title: "Error", Width: uiconst.ColWidthError}}
 		rows := []table.Row{{"Failed to list security groups: " + m.err.Error()}}
 		return common.NewTable(cols, rows).View()
 	}
@@ -158,8 +159,8 @@ func (m SecurityGroupsModel) View() string {
 
 // updateTableColumns adjusts column widths based on the current width.
 func (m *SecurityGroupsModel) updateTableColumns() {
-	idW := 36
-	statefulW := 8
+	idW := uiconst.ColWidthUUID
+	statefulW := uiconst.ColWidthStateful
 	// Remaining width for Name and Description
 	remaining := m.width - idW - statefulW - 6
 	if remaining < 20 {

@@ -9,6 +9,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 )
 
 type securityGroupJSON struct {
@@ -84,7 +85,7 @@ func (m SecurityGroupDetailModel) Init() tea.Cmd {
 			return securityGroupDetailDataLoadedMsg{err: fmt.Errorf("security group %s not found", m.sgID)}
 		}
 		// Build group details table.
-		groupCols := []table.Column{{Title: "Field", Width: 20}, {Title: "Value", Width: 60}}
+		groupCols := []table.Column{{Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValue}}
 		groupRows := []table.Row{{"ID", sg.ID}, {"Name", sg.Name}, {"Description", sg.Description}, {"Stateful", fmt.Sprintf("%v", sg.Stateful)}}
 		groupTbl := table.New(
 			table.WithColumns(groupCols),
@@ -97,11 +98,11 @@ func (m SecurityGroupDetailModel) Init() tea.Cmd {
 		var rulesTbl table.Model
 		if rErr != nil {
 			// If rule loading fails, create an empty table with error row.
-			cols := []table.Column{{Title: "Error", Width: 80}}
+			cols := []table.Column{{Title: "Error", Width: uiconst.ColWidthError}}
 			rows := []table.Row{{"Failed to load rules: " + rErr.Error()}}
 			rulesTbl = table.New(table.WithColumns(cols), table.WithRows(rows))
 		} else {
-			ruleCols := []table.Column{{Title: "ID", Width: 36}, {Title: "Direction", Width: 8}, {Title: "EtherType", Width: 8}, {Title: "Protocol", Width: 6}, {Title: "PortRange", Width: 12}, {Title: "RemoteIP", Width: 15}, {Title: "RemoteGroup", Width: 36}}
+			ruleCols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Direction", Width: uiconst.ColWidthDirection}, {Title: "EtherType", Width: uiconst.ColWidthEtherType}, {Title: "Protocol", Width: uiconst.ColWidthProtocol}, {Title: "PortRange", Width: uiconst.ColWidthPortRange}, {Title: "RemoteIP", Width: uiconst.ColWidthRemoteIP}, {Title: "RemoteGroup", Width: uiconst.ColWidthUUID}}
 			ruleRows := []table.Row{}
 			for _, r := range rulesList {
 				portRange := ""
@@ -114,7 +115,7 @@ func (m SecurityGroupDetailModel) Init() tea.Cmd {
 				table.WithColumns(ruleCols),
 				table.WithRows(ruleRows),
 				table.WithFocused(true),
-				table.WithHeight(m.height-6),
+				table.WithHeight(m.height-uiconst.TableHeightOffset),
 			)
 			rulesTbl.SetStyles(table.DefaultStyles())
 		}
@@ -141,8 +142,8 @@ func (m SecurityGroupDetailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.rulesTable = msg.rulesTbl
 		m.sgJSON = msg.sgJSON
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - 6)
-		m.rulesTable.SetHeight(m.height - 6)
+		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
+		m.rulesTable.SetHeight(m.height - uiconst.TableHeightOffset)
 		return m, nil
 	case tea.WindowSizeMsg:
 		if m.jsonView != "" {
@@ -155,8 +156,8 @@ func (m SecurityGroupDetailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		if !m.loading {
 			m.updateTableColumns()
-			m.table.SetHeight(m.height - 6)
-			m.rulesTable.SetHeight(m.height - 6)
+			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
+			m.rulesTable.SetHeight(m.height - uiconst.TableHeightOffset)
 		}
 		return m, nil
 	case tea.KeyMsg:

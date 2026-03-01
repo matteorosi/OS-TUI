@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 )
 
 // SubnetDetailModel displays detailed information for a single network subnet.
@@ -39,7 +40,7 @@ func (m SubnetDetailModel) Init() tea.Cmd {
 		if err != nil {
 			return subnetDetailDataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "Field", Width: 20}, {Title: "Value", Width: 60}}
+		cols := []table.Column{{Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValue}}
 		rows := []table.Row{{"ID", s.ID}, {"Name", s.Name}, {"NetworkID", s.NetworkID}, {"CIDR", s.CIDR}, {"IPVersion", fmt.Sprintf("%d", s.IPVersion)}, {"GatewayIP", s.GatewayIP}, {"EnableDHCP", fmt.Sprintf("%v", s.EnableDHCP)}}
 		t := table.New(
 			table.WithColumns(cols),

@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
 	"ostui/internal/ui/common"
+	"ostui/internal/ui/uiconst"
 )
 
 type UsersModel struct {
@@ -42,7 +43,7 @@ func (m UsersModel) Init() tea.Cmd {
 		if err != nil {
 			return usersDataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 20}, {Title: "Domain ID", Width: 20}, {Title: "Enabled", Width: 8}}
+		cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "Domain ID", Width: uiconst.ColWidthName}, {Title: "Enabled", Width: uiconst.ColWidthEnabled}}
 		rows := []table.Row{}
 		for _, u := range userList {
 			rows = append(rows, table.Row{u.ID, u.Name, u.DomainID, fmt.Sprintf("%t", u.Enabled)})
@@ -51,7 +52,7 @@ func (m UsersModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return usersDataLoadedMsg{tbl: t}
@@ -69,13 +70,13 @@ func (m UsersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.table = msg.tbl
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - 6)
+		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		if m.table.Columns() != nil {
-			m.table.SetHeight(m.height - 6)
+			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 			m.updateTableColumns()
 		}
 		return m, nil
@@ -102,7 +103,7 @@ func (m UsersModel) View() string {
 		return m.spinner.View()
 	}
 	if m.err != nil {
-		cols := []table.Column{{Title: "Error", Width: 80}}
+		cols := []table.Column{{Title: "Error", Width: uiconst.ColWidthError}}
 		rows := []table.Row{{"Failed to list users: " + m.err.Error()}}
 		return common.NewTable(cols, rows).View()
 	}
@@ -114,10 +115,10 @@ func (m UsersModel) Table() table.Model { return m.table }
 
 // updateTableColumns adjusts column widths based on the current width.
 func (m *UsersModel) updateTableColumns() {
-	idW := 36
-	enabledW := 8
-	domainW := 20
-	nameW := m.width - idW - domainW - enabledW - 6
+	idW := uiconst.ColWidthUUID
+	enabledW := uiconst.ColWidthEnabled
+	domainW := uiconst.ColWidthName
+	nameW := m.width - idW - domainW - enabledW - uiconst.TableHeightOffset
 	if nameW < 10 {
 		nameW = 10
 	}

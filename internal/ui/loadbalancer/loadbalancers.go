@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 	"strings"
 )
 
@@ -51,7 +52,7 @@ func (m LoadBalancersModel) Init() tea.Cmd {
 		if err != nil {
 			return loadBalancersDataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 30}, {Title: "VIP Address", Width: 16}, {Title: "Provisioning", Width: 14}, {Title: "Operating", Width: 12}}
+		cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthNameLong}, {Title: "VIP Address", Width: uiconst.ColWidthVIPAddress}, {Title: "Provisioning", Width: uiconst.ColWidthProvisioning}, {Title: "Operating", Width: uiconst.ColWidthOperating}}
 		rows := []table.Row{}
 		for _, lb := range lbs {
 			rows = append(rows, table.Row{lb.ID, lb.Name, lb.VipAddress, lb.ProvisioningStatus, lb.OperatingStatus})
@@ -60,7 +61,7 @@ func (m LoadBalancersModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return loadBalancersDataLoadedMsg{tbl: t, rows: rows}
@@ -78,14 +79,14 @@ func (m LoadBalancersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.table = msg.tbl
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - 6)
+		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 		m.allRows = msg.rows
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		if m.table.Columns() != nil {
-			m.table.SetHeight(m.height - 6)
+			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 			m.updateTableColumns()
 		}
 		return m, nil
@@ -191,10 +192,10 @@ func (m LoadBalancersModel) View() string {
 func (m LoadBalancersModel) Table() table.Model { return m.table }
 
 func (m *LoadBalancersModel) updateTableColumns() {
-	idW := 36
-	vipW := 16
-	provW := 14
-	operW := 12
+	idW := uiconst.ColWidthUUID
+	vipW := uiconst.ColWidthVIPAddress
+	provW := uiconst.ColWidthProvisioning
+	operW := uiconst.ColWidthOperating
 	nameW := m.width - idW - vipW - provW - operW - 6
 	if nameW < 10 {
 		nameW = 10

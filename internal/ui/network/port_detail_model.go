@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 )
 
 // PortDetailModel displays detailed information for a single network port.
@@ -48,7 +49,7 @@ func (m PortDetailModel) Init() tea.Cmd {
 			}
 			fixedIPs = fmt.Sprintf("%s", fmt.Sprint(parts))
 		}
-		cols := []table.Column{{Title: "Field", Width: 20}, {Title: "Value", Width: 60}}
+		cols := []table.Column{{Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValue}}
 		rows := []table.Row{{"ID", p.ID}, {"Name", p.Name}, {"Status", fmt.Sprintf("%v", p.Status)}, {"NetworkID", p.NetworkID}, {"MACAddress", p.MACAddress}, {"DeviceOwner", p.DeviceOwner}, {"FixedIPs", fixedIPs}}
 		t := table.New(
 			table.WithColumns(cols),

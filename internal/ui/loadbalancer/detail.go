@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 )
 
 // LoadBalancerDetailModel shows listeners and pools for a load balancer.
@@ -79,7 +80,7 @@ func (m LoadBalancerDetailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.listeners = msg.listeners
 		m.pools = msg.pools
 		// Build listeners table.
-		lcols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 30}, {Title: "Protocol", Width: 10}, {Title: "Port", Width: 6}, {Title: "Status", Width: 14}}
+		lcols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthNameLong}, {Title: "Protocol", Width: uiconst.ColWidthProtocol}, {Title: "Port", Width: uiconst.ColWidthPort}, {Title: "Status", Width: uiconst.ColWidthStatusLong}}
 		lrows := []table.Row{}
 		for _, l := range m.listeners {
 			lrows = append(lrows, table.Row{l.ID, l.Name, l.Protocol, fmt.Sprintf("%d", l.ProtocolPort), l.ProvisioningStatus})

@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 )
 
 type VolumeDetailModel struct {
@@ -54,7 +55,7 @@ func (m VolumeDetailModel) Init() tea.Cmd {
 		if err != nil {
 			return volumeDetailDataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "Field", Width: 20}, {Title: "Value", Width: 30}, {Title: "Field", Width: 20}, {Title: "Value", Width: 30}}
+		cols := []table.Column{{Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValueShort}, {Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValueShort}}
 		rows := []table.Row{{"ID", vol.ID}, {"Name", vol.Name}, {"Size", fmt.Sprintf("%d", vol.Size)}, {"Status", vol.Status}, {"Description", vol.Description}}
 		half := (len(rows) + 1) / 2
 		newRows := []table.Row{}
@@ -187,7 +188,7 @@ func (m VolumeDetailModel) View() string {
 		return fmt.Sprintf("%s\n %3.f%% | [j/k] scroll  [esc] close", m.inspectViewport.View(), m.inspectViewport.ScrollPercent()*100)
 	}
 	if m.err != nil {
-		cols := []table.Column{{Title: "Error", Width: 80}}
+		cols := []table.Column{{Title: "Error", Width: uiconst.ColWidthError}}
 		rows := []table.Row{{"Failed to load volume: " + m.err.Error()}}
 		return table.New(table.WithColumns(cols), table.WithRows(rows)).View()
 	}

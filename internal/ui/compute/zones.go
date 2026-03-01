@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 )
 
 // ZonesModel implements a subview for listing OpenStack availability zones.
@@ -42,7 +43,7 @@ func (m ZonesModel) Init() tea.Cmd {
 			return zonesDataLoadedMsg{err: err}
 		}
 		// Define columns; Name will be resized dynamically.
-		cols := []table.Column{{Title: "Name", Width: 20}, {Title: "Available", Width: 10}}
+		cols := []table.Column{{Title: "Name", Width: uiconst.ColWidthName}, {Title: "Available", Width: uiconst.ColWidthType}}
 		rows := []table.Row{}
 		for _, z := range zones {
 			rows = append(rows, table.Row{z.ZoneName, fmt.Sprintf("%t", z.ZoneState.Available)})
@@ -51,7 +52,7 @@ func (m ZonesModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return zonesDataLoadedMsg{tbl: t}
@@ -77,7 +78,7 @@ func (m ZonesModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		if m.table.Columns() != nil {
-			m.table.SetHeight(m.height - 6)
+			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 			m.updateTableColumns()
 		}
 		return m, nil
@@ -112,9 +113,9 @@ func (m ZonesModel) View() string {
 // updateTableColumns adjusts column widths based on the current width.
 func (m *ZonesModel) updateTableColumns() {
 	// Fixed column widths.
-	availableW := 10
+	availableW := uiconst.ColWidthType
 	// Compute flexible name width.
-	nameW := m.width - availableW - 6
+	nameW := m.width - availableW - uiconst.TableHeightOffset
 	if nameW < 10 {
 		nameW = 10
 	}

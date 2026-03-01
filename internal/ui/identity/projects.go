@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
 	"ostui/internal/ui/common"
+	"ostui/internal/ui/uiconst"
 	"strings"
 )
 
@@ -46,7 +47,7 @@ func (m ProjectsModel) Init() tea.Cmd {
 		if err != nil {
 			return projectsDataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 20}, {Title: "Domain ID", Width: 20}}
+		cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "Domain ID", Width: uiconst.ColWidthName}}
 		rows := []table.Row{}
 		for _, p := range projList {
 			rows = append(rows, table.Row{p.ID, p.Name, p.DomainID})
@@ -55,7 +56,7 @@ func (m ProjectsModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return projectsDataLoadedMsg{tbl: t, rows: rows}
@@ -144,7 +145,7 @@ func (m ProjectsModel) View() string {
 		return m.spinner.View()
 	}
 	if m.err != nil {
-		cols := []table.Column{{Title: "Error", Width: 80}}
+		cols := []table.Column{{Title: "Error", Width: uiconst.ColWidthError}}
 		rows := []table.Row{{"Failed to list projects: " + m.err.Error()}}
 		return common.NewTable(cols, rows).View()
 	}
@@ -160,9 +161,9 @@ func (m ProjectsModel) View() string {
 func (m ProjectsModel) Table() table.Model { return m.table }
 
 func (m *ProjectsModel) updateTableColumns() {
-	idW := 36
-	domainW := 20
-	nameW := m.width - idW - domainW - 6
+	idW := uiconst.ColWidthUUID
+	domainW := uiconst.ColWidthName
+	nameW := m.width - idW - domainW - uiconst.TableHeightOffset
 	if nameW < 10 {
 		nameW = 10
 	}

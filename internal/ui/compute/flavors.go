@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 	"strings"
 )
 
@@ -50,7 +51,7 @@ func (m FlavorsModel) Init() tea.Cmd {
 		if err != nil {
 			return flavorsDataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 20}, {Title: "VCPUs", Width: 6}, {Title: "RAM (MB)", Width: 8}, {Title: "Disk (GB)", Width: 8}}
+		cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "VCPUs", Width: uiconst.ColWidthProtocol}, {Title: "RAM (MB)", Width: uiconst.ColWidthEnabled}, {Title: "Disk (GB)", Width: uiconst.ColWidthEnabled}}
 		rows := []table.Row{}
 		for _, f := range flavorList {
 			rows = append(rows, table.Row{f.ID, f.Name, fmt.Sprintf("%d", f.VCPUs), fmt.Sprintf("%d", f.RAM), fmt.Sprintf("%d", f.Disk)})
@@ -59,7 +60,7 @@ func (m FlavorsModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return flavorsDataLoadedMsg{tbl: t, rows: rows}
@@ -79,13 +80,13 @@ func (m FlavorsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table = msg.tbl
 		m.allRows = msg.rows
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - 6)
+		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		if m.table.Columns() != nil {
-			m.table.SetHeight(m.height - 6)
+			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 			m.updateTableColumns()
 		}
 		return m, nil
@@ -159,12 +160,12 @@ func (m FlavorsModel) View() string {
 
 // updateTableColumns adjusts column widths based on the current width.
 func (m *FlavorsModel) updateTableColumns() {
-	idW := 36
-	vcpusW := 6
-	ramW := 8
-	diskW := 8
+	idW := uiconst.ColWidthUUID
+	vcpusW := uiconst.ColWidthProtocol
+	ramW := uiconst.ColWidthEnabled
+	diskW := uiconst.ColWidthEnabled
 	// Name column gets remaining space.
-	nameW := m.width - idW - vcpusW - ramW - diskW - 6
+	nameW := m.width - idW - vcpusW - ramW - diskW - uiconst.TableHeightOffset
 	if nameW < 10 {
 		nameW = 10
 	}

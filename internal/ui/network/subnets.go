@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
 	"ostui/internal/ui/common"
+	"ostui/internal/ui/uiconst"
 )
 
 type SubnetsModel struct {
@@ -42,7 +43,7 @@ func (m SubnetsModel) Init() tea.Cmd {
 		if err != nil {
 			return subnetsDataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 20}, {Title: "CIDR", Width: 20}, {Title: "IPVer", Width: 6}}
+		cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "CIDR", Width: uiconst.ColWidthCIDR}, {Title: "IPVer", Width: uiconst.ColWidthIPVersion}}
 		rows := []table.Row{}
 		for _, s := range subList {
 			rows = append(rows, table.Row{s.ID, s.Name, s.CIDR, fmt.Sprintf("%d", s.IPVersion)})
@@ -51,7 +52,7 @@ func (m SubnetsModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return subnetsDataLoadedMsg{tbl: t}
@@ -69,13 +70,13 @@ func (m SubnetsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.table = msg.tbl
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - 6)
+		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		if m.table.Columns() != nil {
-			m.table.SetHeight(m.height - 6)
+			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 			m.updateTableColumns()
 		}
 		return m, nil
@@ -102,7 +103,7 @@ func (m SubnetsModel) View() string {
 		return m.spinner.View()
 	}
 	if m.err != nil {
-		cols := []table.Column{{Title: "Error", Width: 80}}
+		cols := []table.Column{{Title: "Error", Width: uiconst.ColWidthError}}
 		rows := []table.Row{{"Failed to list subnets: " + m.err.Error()}}
 		return common.NewTable(cols, rows).View()
 	}
@@ -115,9 +116,9 @@ func (m SubnetsModel) Table() table.Model { return m.table }
 
 // updateTableColumns adjusts column widths based on the current width.
 func (m *SubnetsModel) updateTableColumns() {
-	idW := 36
-	cidrW := 20
-	ipverW := 6
+	idW := uiconst.ColWidthUUID
+	cidrW := uiconst.ColWidthCIDR
+	ipverW := uiconst.ColWidthIPVersion
 	nameW := m.width - idW - cidrW - ipverW - 6
 	if nameW < 10 {
 		nameW = 10

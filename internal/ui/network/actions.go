@@ -6,6 +6,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/floatingips"
 	"ostui/internal/client"
 	"ostui/internal/ui/common"
+	"ostui/internal/ui/uiconst"
 )
 
 // AllocateFloatingIP allocates a new floating IP on the given network ID.
@@ -14,12 +15,12 @@ func AllocateFloatingIP(nc client.NetworkClient, networkID string) string {
 	opts := floatingips.CreateOpts{FloatingNetworkID: networkID}
 	fip, err := nc.AllocateFloatingIP(opts)
 	if err != nil {
-		cols := []table.Column{{Title: "Error", Width: 80}}
+		cols := []table.Column{{Title: "Error", Width: uiconst.ColWidthError}}
 		rows := []table.Row{{"Failed to allocate floating IP: " + err.Error()}}
 		return common.NewTable(cols, rows).View()
 	}
 	// Show allocated floating IP details.
-	cols := []table.Column{{Title: "ID", Width: 36}, {Title: "FloatingNetworkID", Width: 36}, {Title: "FixedIP", Width: 15}, {Title: "PortID", Width: 36}, {Title: "Status", Width: 12}}
+	cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "FloatingNetworkID", Width: uiconst.ColWidthUUID}, {Title: "FixedIP", Width: uiconst.ColWidthFixed}, {Title: "PortID", Width: uiconst.ColWidthUUID}, {Title: "Status", Width: uiconst.ColWidthStatus}}
 	rows := []table.Row{{fip.ID, fip.FloatingNetworkID, fip.FixedIP, fip.PortID, fip.Status}}
 	return common.NewTable(cols, rows).View()
 }
@@ -29,7 +30,7 @@ func AllocateFloatingIP(nc client.NetworkClient, networkID string) string {
 func ReleaseFloatingIP(nc client.NetworkClient, fipID string) string {
 	err := nc.ReleaseFloatingIP(fipID)
 	if err != nil {
-		cols := []table.Column{{Title: "Error", Width: 80}}
+		cols := []table.Column{{Title: "Error", Width: uiconst.ColWidthError}}
 		rows := []table.Row{{"Failed to release floating IP: " + err.Error()}}
 		return common.NewTable(cols, rows).View()
 	}
@@ -41,11 +42,11 @@ func ReleaseFloatingIP(nc client.NetworkClient, fipID string) string {
 func AssociateFloatingIP(nc client.NetworkClient, fipID, portID string) string {
 	fip, err := nc.AssociateFloatingIP(fipID, portID)
 	if err != nil {
-		cols := []table.Column{{Title: "Error", Width: 80}}
+		cols := []table.Column{{Title: "Error", Width: uiconst.ColWidthError}}
 		rows := []table.Row{{"Failed to associate floating IP: " + err.Error()}}
 		return common.NewTable(cols, rows).View()
 	}
-	cols := []table.Column{{Title: "ID", Width: 36}, {Title: "FloatingNetworkID", Width: 36}, {Title: "FixedIP", Width: 15}, {Title: "PortID", Width: 36}, {Title: "Status", Width: 12}}
+	cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "FloatingNetworkID", Width: uiconst.ColWidthUUID}, {Title: "FixedIP", Width: uiconst.ColWidthFixed}, {Title: "PortID", Width: uiconst.ColWidthUUID}, {Title: "Status", Width: uiconst.ColWidthStatus}}
 	rows := []table.Row{{fip.ID, fip.FloatingNetworkID, fip.FixedIP, fip.PortID, fip.Status}}
 	return common.NewTable(cols, rows).View()
 }
@@ -55,11 +56,11 @@ func AssociateFloatingIP(nc client.NetworkClient, fipID, portID string) string {
 func DisassociateFloatingIP(nc client.NetworkClient, fipID string) string {
 	fip, err := nc.DisassociateFloatingIP(fipID)
 	if err != nil {
-		cols := []table.Column{{Title: "Error", Width: 80}}
+		cols := []table.Column{{Title: "Error", Width: uiconst.ColWidthError}}
 		rows := []table.Row{{"Failed to disassociate floating IP: " + err.Error()}}
 		return common.NewTable(cols, rows).View()
 	}
-	cols := []table.Column{{Title: "ID", Width: 36}, {Title: "FloatingNetworkID", Width: 36}, {Title: "FixedIP", Width: 15}, {Title: "PortID", Width: 36}, {Title: "Status", Width: 12}}
+	cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "FloatingNetworkID", Width: uiconst.ColWidthUUID}, {Title: "FixedIP", Width: uiconst.ColWidthFixed}, {Title: "PortID", Width: uiconst.ColWidthUUID}, {Title: "Status", Width: uiconst.ColWidthStatus}}
 	rows := []table.Row{{fip.ID, fip.FloatingNetworkID, fip.FixedIP, fip.PortID, fip.Status}}
 	return common.NewTable(cols, rows).View()
 }

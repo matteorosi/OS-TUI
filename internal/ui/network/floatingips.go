@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
 	"ostui/internal/ui/common"
+	"ostui/internal/ui/uiconst"
 	"strings"
 )
 
@@ -48,7 +49,7 @@ func (m FloatingIPsModel) Init() tea.Cmd {
 		if err != nil {
 			return floatingIPsDataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "ID", Width: 36}, {Title: "FloatingNetworkID", Width: 36}, {Title: "FixedIP", Width: 20}, {Title: "PortID", Width: 36}, {Title: "Status", Width: 12}}
+		cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "FloatingNetworkID", Width: uiconst.ColWidthUUID}, {Title: "FixedIP", Width: uiconst.ColWidthFixed}, {Title: "PortID", Width: uiconst.ColWidthUUID}, {Title: "Status", Width: uiconst.ColWidthStatus}}
 		rows := []table.Row{}
 		for _, f := range fipList {
 			rows = append(rows, table.Row{f.ID, f.FloatingNetworkID, f.FixedIP, f.PortID, f.Status})
@@ -57,7 +58,7 @@ func (m FloatingIPsModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return floatingIPsDataLoadedMsg{tbl: t, rows: rows}
@@ -76,13 +77,13 @@ func (m FloatingIPsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table = msg.tbl
 		m.allRows = msg.rows
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - 6)
+		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		if m.table.Columns() != nil {
-			m.table.SetHeight(m.height - 6)
+			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 			m.updateTableColumns()
 		}
 		return m, nil
@@ -144,7 +145,7 @@ func (m FloatingIPsModel) View() string {
 		return m.spinner.View()
 	}
 	if m.err != nil {
-		cols := []table.Column{{Title: "Error", Width: 80}}
+		cols := []table.Column{{Title: "Error", Width: uiconst.ColWidthError}}
 		rows := []table.Row{{"Failed to list floating IPs: " + m.err.Error()}}
 		return common.NewTable(cols, rows).View()
 	}
@@ -158,12 +159,12 @@ func (m FloatingIPsModel) View() string {
 
 // updateTableColumns adjusts column widths based on the current width.
 func (m *FloatingIPsModel) updateTableColumns() {
-	idW := 36
-	fnetW := 36
-	portIDW := 36
-	statusW := 12
+	idW := uiconst.ColWidthUUID
+	fnetW := uiconst.ColWidthUUID
+	portIDW := uiconst.ColWidthUUID
+	statusW := uiconst.ColWidthStatus
 	// FixedIP column gets remaining space
-	fixedIPW := m.width - idW - fnetW - portIDW - statusW - 6
+	fixedIPW := m.width - idW - fnetW - portIDW - statusW - uiconst.TableHeightOffset
 	if fixedIPW < 10 {
 		fixedIPW = 10
 	}

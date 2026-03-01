@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 )
 
 // KeypairDetailModel displays detailed information for a single compute keypair.
@@ -44,7 +45,7 @@ func (m KeypairDetailModel) Init() tea.Cmd {
 		if len(pub) > 60 {
 			pub = pub[:60] + "..."
 		}
-		cols := []table.Column{{Title: "Field", Width: 20}, {Title: "Value", Width: 60}}
+		cols := []table.Column{{Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValue}}
 		rows := []table.Row{{"Name", kp.Name}, {"Fingerprint", kp.Fingerprint}, {"Type", kp.Type}, {"PublicKey", pub}}
 		t := table.New(
 			table.WithColumns(cols),

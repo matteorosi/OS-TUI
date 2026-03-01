@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 )
 
 // FlavorDetailModel displays detailed information for a single compute flavor.
@@ -39,7 +40,7 @@ func (m FlavorDetailModel) Init() tea.Cmd {
 		if err != nil {
 			return flavorDetailDataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "Field", Width: 20}, {Title: "Value", Width: 60}}
+		cols := []table.Column{{Title: "Field", Width: uiconst.ColWidthField}, {Title: "Value", Width: uiconst.ColWidthValue}}
 		rows := []table.Row{{"ID", f.ID}, {"Name", f.Name}, {"VCPUs", fmt.Sprintf("%d", f.VCPUs)}, {"RAM (MB)", fmt.Sprintf("%d", f.RAM)}, {"Disk (GB)", fmt.Sprintf("%d", f.Disk)}, {"Swap", fmt.Sprintf("%d", f.Swap)}, {"IsPublic", fmt.Sprintf("%v", f.IsPublic)}}
 		t := table.New(
 			table.WithColumns(cols),

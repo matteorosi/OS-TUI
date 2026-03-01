@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 	"strings"
 )
 
@@ -47,7 +48,7 @@ func (m VolumesModel) Init() tea.Cmd {
 		if err != nil {
 			return dataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 20}, {Title: "Size", Width: 8}, {Title: "Status", Width: 12}}
+		cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "Size", Width: uiconst.ColWidthSize}, {Title: "Status", Width: uiconst.ColWidthStatus}}
 		rows := []table.Row{}
 		for _, v := range volList {
 			rows = append(rows, table.Row{v.ID, v.Name, fmt.Sprintf("%d", v.Size), v.Status})
@@ -56,7 +57,7 @@ func (m VolumesModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return dataLoadedMsg{tbl: t, rows: rows}
@@ -157,10 +158,10 @@ func (m VolumesModel) View() string {
 
 // updateTableColumns adjusts column widths based on the current width.
 func (m *VolumesModel) updateTableColumns() {
-	idW := 36
-	sizeW := 8
-	statusW := 12
-	nameW := m.width - idW - sizeW - statusW - 6
+	idW := uiconst.ColWidthUUID
+	sizeW := uiconst.ColWidthSize
+	statusW := uiconst.ColWidthStatus
+	nameW := m.width - idW - sizeW - statusW - uiconst.TableHeightOffset
 	if nameW < 10 {
 		nameW = 10
 	}

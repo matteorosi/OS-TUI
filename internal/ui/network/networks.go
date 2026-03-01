@@ -7,6 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/uiconst"
 	"strings"
 )
 
@@ -47,7 +48,7 @@ func (m NetworksModel) Init() tea.Cmd {
 		if err != nil {
 			return dataLoadedMsg{err: err}
 		}
-		cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 20}, {Title: "Status", Width: 12}}
+		cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "Status", Width: uiconst.ColWidthStatus}}
 		rows := []table.Row{}
 		for _, n := range netList {
 			rows = append(rows, table.Row{n.ID, n.Name, n.Status})
@@ -56,7 +57,7 @@ func (m NetworksModel) Init() tea.Cmd {
 			table.WithColumns(cols),
 			table.WithRows(rows),
 			table.WithFocused(true),
-			table.WithHeight(m.height-6),
+			table.WithHeight(m.height-uiconst.TableHeightOffset),
 		)
 		t.SetStyles(table.DefaultStyles())
 		return dataLoadedMsg{tbl: t, rows: rows}
@@ -74,14 +75,14 @@ func (m NetworksModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.table = msg.tbl
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - 6)
+		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 		m.allRows = msg.rows
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		if m.table.Columns() != nil {
-			m.table.SetHeight(m.height - 6)
+			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
 			m.updateTableColumns()
 		}
 		return m, nil
@@ -161,8 +162,8 @@ func (m NetworksModel) Table() table.Model { return m.table }
 
 // updateTableColumns adjusts column widths based on the current width.
 func (m *NetworksModel) updateTableColumns() {
-	idW := 36
-	statusW := 12
+	idW := uiconst.ColWidthUUID
+	statusW := uiconst.ColWidthStatus
 	nameW := m.width - idW - statusW - 6
 	if nameW < 10 {
 		nameW = 10

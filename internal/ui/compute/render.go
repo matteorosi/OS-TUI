@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	"ostui/internal/client"
 	"ostui/internal/ui/common"
+	"ostui/internal/ui/uiconst"
 	"time"
 )
 
@@ -25,7 +26,7 @@ func RenderInstances(cc client.ComputeClient) string {
 	if err != nil {
 		return fmt.Sprintf("Failed to list instances: %s", err)
 	}
-	cols := []table.Column{{Title: "ID", Width: 36}, {Title: "Name", Width: 20}, {Title: "Status", Width: 12}}
+	cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "Status", Width: uiconst.ColWidthStatus}}
 	rows := []table.Row{}
 	for _, s := range srvList {
 		rows = append(rows, table.Row{s.ID, s.Name, s.Status})
@@ -34,7 +35,7 @@ func RenderInstances(cc client.ComputeClient) string {
 		table.WithColumns(cols),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(20),
+		table.WithHeight(uiconst.TableHeightDefault),
 	)
 	t.SetStyles(table.DefaultStyles())
 	return t.View()
