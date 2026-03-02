@@ -74,6 +74,9 @@ func (m *mockComputeClient) ListServerVolumes(ctx context.Context, serverID stri
 	return []client.ServerVolume{}, nil
 }
 
+// RebootInstance stub for new method.
+func (m *mockComputeClient) RebootInstance(id string) error { return nil }
+
 func TestRenderInstancesSuccess(t *testing.T) {
 	mock := &mockComputeClient{
 		listInstances: []servers.Server{{ID: "123", Name: "test-instance", Status: "ACTIVE"}},

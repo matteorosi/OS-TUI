@@ -5,23 +5,19 @@ import (
 	"fmt"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/common"
 	"ostui/internal/ui/uiconst"
-	"strings"
 )
 
 // HypervisorsModel implements a subview for listing OpenStack hypervisors.
 type HypervisorsModel struct {
-	table      table.Model
-	loading    bool
-	err        error
-	spinner    spinner.Model
-	client     client.ComputeClient
-	allRows    []table.Row
-	filterMode bool
-	filter     textinput.Model
+	ft      common.FilterableTable
+	loading bool
+	err     error
+	spinner spinner.Model
+	client  client.ComputeClient
 	// Dynamic sizing
 	width  int
 	height int
@@ -31,10 +27,7 @@ type HypervisorsModel struct {
 func NewHypervisorsModel(cc client.ComputeClient) HypervisorsModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	ti := textinput.New()
-	ti.Placeholder = "filter..."
-	// Initialize with reasonable defaults.
-	return HypervisorsModel{client: cc, loading: true, spinner: s, filter: ti, width: 120, height: 30}
+	return HypervisorsModel{client: cc, loading: true, spinner: s, ft: common.NewFilterableTable(), width: 120, height: 30}
 }
 
 type hypervisorsDataLoadedMsg struct {
@@ -50,7 +43,6 @@ func (m HypervisorsModel) Init() tea.Cmd {
 		if err != nil {
 			return hypervisorsDataLoadedMsg{err: err}
 		}
-		// Define a concise set of columns.
 		cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Hostname", Width: uiconst.ColWidthName}, {Title: "State", Width: uiconst.ColWidthProtocol}, {Title: "Status", Width: uiconst.ColWidthEnabled}, {Title: "VCPUs", Width: uiconst.ColWidthProtocol}, {Title: "VCPUs Used", Width: uiconst.ColWidthType}, {Title: "RAM MB", Width: uiconst.ColWidthEnabled}, {Title: "RAM Used", Width: uiconst.ColWidthRAMUsed}, {Title: "Disk GB", Width: uiconst.ColWidthEnabled}, {Title: "Disk Used", Width: uiconst.ColWidthRAMUsed}}
 		rows := []table.Row{}
 		for _, hv := range hvList {
@@ -76,59 +68,27 @@ func (m HypervisorsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
-		m.table = msg.tbl
-		m.allRows = msg.rows
-		// Adjust columns and height based on current dimensions.
+		m.ft.SetTable(msg.tbl, msg.rows)
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
+		m.ft.SetHeight(m.height - uiconst.TableHeightOffset)
 		return m, nil
 	case tea.WindowSizeMsg:
-		// Update stored dimensions and adjust table.
 		m.width = msg.Width
 		m.height = msg.Height
-		if m.table.Columns() != nil {
-			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
+		if m.ft.Table.Columns() != nil {
+			m.ft.SetHeight(m.height - uiconst.TableHeightOffset)
 			m.updateTableColumns()
 		}
 		return m, nil
 	case tea.KeyMsg:
-		// Filter mode handling – same pattern as InstancesModel.
-		if !m.filterMode && msg.String() == "/" {
-			m.filterMode = true
-			m.filter.Focus()
-			return m, textinput.Blink
-		}
-		if m.filterMode && msg.String() == "esc" {
-			m.filterMode = false
-			m.filter.Blur()
-			m.filter.SetValue("")
-			m.table.SetRows(m.allRows)
+		if m.loading || m.err != nil {
 			return m, nil
 		}
-		if m.filterMode {
-			var cmd tea.Cmd
-			m.filter, cmd = m.filter.Update(msg)
-			filterVal := m.filter.Value()
-			if filterVal == "" {
-				m.table.SetRows(m.allRows)
-			} else {
-				lower := strings.ToLower(filterVal)
-				filtered := []table.Row{}
-				for _, r := range m.allRows {
-					for _, c := range r {
-						if strings.Contains(strings.ToLower(c), lower) {
-							filtered = append(filtered, r)
-							break
-						}
-					}
-				}
-				m.table.SetRows(filtered)
-			}
+		if handled, cmd := m.ft.Update(msg); handled {
 			return m, cmd
 		}
-		// Normal navigation.
-		var cmd tea.Cmd
-		m.table, cmd = m.table.Update(msg)
+		// Normal navigation
+		cmd := m.ft.UpdateTable(msg)
 		return m, cmd
 	default:
 		if m.loading {
@@ -148,7 +108,7 @@ func (m HypervisorsModel) View() string {
 	if m.err != nil {
 		return fmt.Sprintf("Error: %s", m.err)
 	}
-	return m.table.View()
+	return m.ft.View()
 }
 
 // updateTableColumns adjusts column widths based on the current width.
@@ -169,10 +129,10 @@ func (m *HypervisorsModel) updateTableColumns() {
 	if hostnameW < 10 {
 		hostnameW = 10
 	}
-	m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Hostname", Width: hostnameW}, {Title: "State", Width: stateW}, {Title: "Status", Width: statusW}, {Title: "VCPUs", Width: vcpusW}, {Title: "VCPUs Used", Width: vcpusUsedW}, {Title: "RAM MB", Width: ramW}, {Title: "RAM Used", Width: ramUsedW}, {Title: "Disk GB", Width: diskW}, {Title: "Disk Used", Width: diskUsedW}})
+	m.ft.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Hostname", Width: hostnameW}, {Title: "State", Width: stateW}, {Title: "Status", Width: statusW}, {Title: "VCPUs", Width: vcpusW}, {Title: "VCPUs Used", Width: vcpusUsedW}, {Title: "RAM MB", Width: ramW}, {Title: "RAM Used", Width: ramUsedW}, {Title: "Disk GB", Width: diskW}, {Title: "Disk Used", Width: diskUsedW}})
 }
 
 // Table returns the underlying table model.
-func (m HypervisorsModel) Table() table.Model { return m.table }
+func (m HypervisorsModel) Table() table.Model { return m.ft.Table }
 
 var _ tea.Model = (*HypervisorsModel)(nil)

@@ -38,6 +38,7 @@ type NetworkClient interface {
 	GetRouterInterfaces(ctx context.Context, id string) ([]RouterInterface, error)
 	CreateRouter(ctx context.Context, name, externalNetID string) (*Router, error)
 	DeleteRouter(ctx context.Context, id string) error
+	DeleteNetwork(id string) error
 	AddRouterInterface(ctx context.Context, routerID, subnetID string) error
 	RemoveRouterInterface(ctx context.Context, routerID, subnetID string) error
 	// Port operations
@@ -277,6 +278,11 @@ func (c *networkClient) CreateSecurityGroupRule(ctx context.Context, sgID string
 func (c *networkClient) DeleteSecurityGroupRule(ctx context.Context, id string) error {
 	_ = ctx
 	return rules.Delete(c.client, id).ExtractErr()
+}
+
+// DeleteNetwork removes a network by ID.
+func (c *networkClient) DeleteNetwork(id string) error {
+	return networks.Delete(c.client, id).ExtractErr()
 }
 
 // Ensure NetworkClient implements the interface.

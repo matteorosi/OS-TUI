@@ -34,6 +34,7 @@ type ComputeClient interface {
 	GetKeypair(ctx context.Context, name string) (keypairs.KeyPair, error)
 	ListServerInterfaces(ctx context.Context, serverID string) ([]ServerInterface, error)
 	ListServerVolumes(ctx context.Context, serverID string) ([]ServerVolume, error)
+	RebootInstance(id string) error
 }
 
 type ServerInterface struct {
@@ -100,6 +101,11 @@ func (c *computeClient) StopInstance(id string) error {
 // DeleteInstance removes the specified server.
 func (c *computeClient) DeleteInstance(id string) error {
 	return servers.Delete(c.client, id).ExtractErr()
+}
+
+// RebootInstance performs a soft reboot of the specified server.
+func (c *computeClient) RebootInstance(id string) error {
+	return servers.Reboot(c.client, id, servers.RebootOpts{Type: servers.SoftReboot}).ExtractErr()
 }
 
 // ListFlavors returns the list of available flavors (instance types).

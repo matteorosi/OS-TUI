@@ -43,6 +43,9 @@ func (m *mockStorageClient) CreateSnapshot(opts snapshots.CreateOptsBuilder) (sn
 	return m.createdSnapshot, m.createSnapErr
 }
 
+// ExtendVolume stub for new method.
+func (m *mockStorageClient) ExtendVolume(id string, newSizeGB int) error { return nil }
+
 type mockObjectStorageClient struct {
 	buckets   []containers.Container
 	bucketErr error

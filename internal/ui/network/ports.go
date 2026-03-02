@@ -5,37 +5,29 @@ import (
 	"fmt"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/common"
 	"ostui/internal/ui/uiconst"
-	"strings"
 )
 
-// PortsModel implements a view that lists ports and shows a read‑only detail view for a selected port.
 type PortsModel struct {
-	// UI components
-	table       table.Model // list view
-	detailTable table.Model // detail view
-	loading     bool
-	err         error
-	spinner     spinner.Model
-	client      client.NetworkClient
-
+	ft      common.FilterableTable
+	loading bool
+	err     error
+	spinner spinner.Model
+	client  client.NetworkClient
 	// Inspect view fields
 	inspectView     string
 	inspectViewport viewport.Model
 	// stored port for inspect view
 	port client.Port
-
 	// State management
-	mode       string // "list" or "detail"
-	portID     string // selected port ID for detail view
-	allRows    []table.Row
-	filterMode bool
-	filter     textinput.Model
-
+	mode   string // "list" or "detail"
+	portID string // selected port ID for detail view
+	// Detail view table
+	detailTable table.Model
 	// Dynamic sizing
 	width  int
 	height int
@@ -45,19 +37,15 @@ type PortsModel struct {
 func NewPortsModel(nc client.NetworkClient) PortsModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	ti := textinput.New()
-	ti.Placeholder = "filter..."
-	return PortsModel{client: nc, loading: true, spinner: s, filter: ti, mode: "list", width: 120, height: 30}
+	return PortsModel{client: nc, loading: true, spinner: s, ft: common.NewFilterableTable(), mode: "list", width: 120, height: 30}
 }
 
-// portsListMsg is emitted when the list of ports has been fetched.
 type portsListMsg struct {
 	tbl  table.Model
 	rows []table.Row
 	err  error
 }
 
-// portDetailMsg is emitted when a port's details have been fetched.
 type portDetailMsg struct {
 	tbl  table.Model
 	err  error
@@ -115,10 +103,9 @@ func (m PortsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
-		m.table = msg.tbl
-		m.allRows = msg.rows
+		m.ft.SetTable(msg.tbl, msg.rows)
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
+		m.ft.SetHeight(m.height - uiconst.TableHeightOffset)
 		return m, nil
 	case portDetailMsg:
 		m.loading = false
@@ -127,31 +114,30 @@ func (m PortsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.detailTable = msg.tbl
-		m.port = msg.port // store the full port for inspect view
+		m.port = msg.port
 		m.mode = "detail"
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		if m.table.Columns() != nil {
-			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
+		if m.ft.Table.Columns() != nil {
+			m.ft.SetHeight(m.height - uiconst.TableHeightOffset)
 			m.updateTableColumns()
 		}
 		return m, nil
 	case tea.KeyMsg:
-		// If Inspect view is active, handle its keys.
+		// Inspect view handling
 		if m.inspectView != "" {
 			if msg.String() == "i" || msg.String() == "esc" {
 				m.inspectView = ""
 				m.inspectViewport = viewport.Model{}
 				return m, nil
 			}
-			// Forward other keys to viewport for scrolling
 			var cmd tea.Cmd
 			m.inspectViewport, cmd = m.inspectViewport.Update(msg)
 			return m, cmd
 		}
-		// Global escape handling: return to list view from detail.
+		// Global escape handling from detail view
 		if msg.String() == "esc" && m.mode == "detail" {
 			m.mode = "list"
 			m.portID = ""
@@ -163,41 +149,11 @@ func (m PortsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if m.mode == "list" {
-			if !m.filterMode && msg.String() == "/" {
-				m.filterMode = true
-				m.filter.Focus()
-				return m, textinput.Blink
-			}
-			if m.filterMode && msg.String() == "esc" {
-				m.filterMode = false
-				m.filter.Blur()
-				m.filter.SetValue("")
-				m.table.SetRows(m.allRows)
-				return m, nil
-			}
-			if m.filterMode {
-				var cmd tea.Cmd
-				m.filter, cmd = m.filter.Update(msg)
-				filterVal := m.filter.Value()
-				if filterVal == "" {
-					m.table.SetRows(m.allRows)
-				} else {
-					lower := strings.ToLower(filterVal)
-					filtered := []table.Row{}
-					for _, r := range m.allRows {
-						for _, c := range r {
-							if strings.Contains(strings.ToLower(c), lower) {
-								filtered = append(filtered, r)
-								break
-							}
-						}
-					}
-					m.table.SetRows(filtered)
-				}
+			if handled, cmd := m.ft.Update(msg); handled {
 				return m, cmd
 			}
 			if msg.String() == "enter" {
-				row := m.table.SelectedRow()
+				row := m.ft.SelectedRow()
 				if len(row) > 0 {
 					m.portID = row[0]
 					m.loading = true
@@ -206,12 +162,11 @@ func (m PortsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			var cmd tea.Cmd
-			m.table, cmd = m.table.Update(msg)
+			m.ft.Table, cmd = m.ft.Table.Update(msg)
 			return m, cmd
 		}
 		if m.mode == "detail" {
 			if msg.String() == "i" {
-				// Build inspect view for the selected port.
 				content := fmt.Sprintf("=== Port: %s ===\nID: %s\nName: %s\nNetworkID: %s\nStatus: %v\nMACAddress: %s\nDeviceID: %s",
 					m.port.Name, m.port.ID, m.port.Name, m.port.NetworkID, m.port.Status, m.port.MACAddress, m.port.DeviceID)
 				m.inspectView = content
@@ -245,19 +200,13 @@ func (m PortsModel) View() string {
 		return fmt.Sprintf("%s\n %3.f%% | [j/k] scroll  [esc] close", m.inspectViewport.View(), m.inspectViewport.ScrollPercent()*100)
 	}
 	if m.mode == "list" {
-		if m.filterMode {
-			filterLine := fmt.Sprintf("Filter: %s", m.filter.View())
-			footer := "esc: clear"
-			return fmt.Sprintf("%s\n%s\n%s", filterLine, m.table.View(), footer)
-		}
-		return m.table.View()
+		return m.ft.View()
 	}
 	// Detail view
 	header := fmt.Sprintf("Port %s details (press esc to go back)", m.portID)
 	return fmt.Sprintf("%s\n%s", header, m.detailTable.View())
 }
 
-// updateTableColumns adjusts column widths based on the current width.
 func (m *PortsModel) updateTableColumns() {
 	idW := uiconst.ColWidthUUID
 	netIDW := uiconst.ColWidthUUID
@@ -266,10 +215,10 @@ func (m *PortsModel) updateTableColumns() {
 	if nameW < 10 {
 		nameW = 10
 	}
-	m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "Network ID", Width: netIDW}, {Title: "Status", Width: statusW}})
+	m.ft.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "Network ID", Width: netIDW}, {Title: "Status", Width: statusW}})
 }
 
 // Table returns the primary table (list view) – useful for navigation.
-func (m PortsModel) Table() table.Model { return m.table }
+func (m PortsModel) Table() table.Model { return m.ft.Table }
 
 var _ tea.Model = (*PortsModel)(nil)

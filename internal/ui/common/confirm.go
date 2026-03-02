@@ -58,6 +58,9 @@ func (m ConfirmModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders the confirm dialog.
+func (m ConfirmModel) Result() string { return m.result }
+func (m ConfirmModel) Done() bool     { return m.done }
+
 func (m ConfirmModel) View() string {
 	if m.done {
 		return "You selected: " + m.result

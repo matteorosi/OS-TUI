@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/gophercloud/gophercloud/openstack"
-	"github.com/gophercloud/gophercloud/v2"
+	gophercloudV2 "github.com/gophercloud/gophercloud/v2"
 	openstackV2 "github.com/gophercloud/gophercloud/v2/openstack"
 	"log"
 	"time"
@@ -77,21 +77,13 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create a v2 provider for DNS and Load Balancer services.
-	var providerV2 *gophercloud.ProviderClient
-	// Convert v1 AuthOptions to v2 AuthOptions.
-	v2AuthOpts := gophercloud.AuthOptions{
+	var providerV2 *gophercloudV2.ProviderClient
+	// Reuse token from v1 provider to avoid double auth.
+	// Use the token obtained by the v1 provider to authenticate v2 — avoids double auth.
+	v2AuthOpts := gophercloudV2.AuthOptions{
 		IdentityEndpoint: authOpts.IdentityEndpoint,
-		Username:         authOpts.Username,
-		UserID:           authOpts.UserID,
-		Password:         authOpts.Password,
-		Passcode:         authOpts.Passcode,
-		DomainID:         authOpts.DomainID,
-		DomainName:       authOpts.DomainName,
-		TenantID:         authOpts.TenantID,
-		TenantName:       authOpts.TenantName,
-		AllowReauth:      authOpts.AllowReauth,
-		TokenID:          authOpts.TokenID,
-		// Scope omitted for simplicity.
+		TokenID:          provider.TokenID,
+		AllowReauth:      false,
 	}
 	providerV2, err = openstackV2.AuthenticatedClient(context.Background(), v2AuthOpts)
 	if err != nil {
@@ -151,18 +143,18 @@ func run(cmd *cobra.Command, args []string) error {
 	var lbClient client.LoadBalancerClient
 
 	if providerV2 != nil {
-		dnsClient, err = client.NewDNSClient(providerV2, gophercloud.EndpointOpts{})
+		dnsClient, err = client.NewDNSClient(providerV2, gophercloudV2.EndpointOpts{})
 		if err != nil {
 			log.Printf("warning: failed to create DNS client: %v", err)
 			dnsClient = nil
 		}
-		lbClient, err = client.NewLoadBalancerClient(providerV2, gophercloud.EndpointOpts{})
+		lbClient, err = client.NewLoadBalancerClient(providerV2, gophercloudV2.EndpointOpts{})
 		if err != nil {
 			log.Printf("warning: failed to create Load Balancer client: %v", err)
 			lbClient = nil
 		}
 		// Save token to cache
-		if tokenID := providerV2.Token(); tokenID != "" {
+		if tokenID := provider.Token(); tokenID != "" {
 			expiresAt := time.Now().Add(1 * time.Hour) // fallback
 			if tokenInfo, err := identityClient.GetTokenInfo(); err == nil && tokenInfo != nil {
 				expiresAt = tokenInfo.ExpiresAt

@@ -1,27 +1,20 @@
 package network
 
 import (
-	"fmt"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
 	"ostui/internal/ui/common"
 	"ostui/internal/ui/uiconst"
-	"strings"
 )
 
 type FloatingIPsModel struct {
-	table      table.Model
-	loading    bool
-	err        error
-	spinner    spinner.Model
-	client     client.NetworkClient
-	allRows    []table.Row
-	filterMode bool
-	filter     textinput.Model
-
+	ft      common.FilterableTable
+	loading bool
+	err     error
+	spinner spinner.Model
+	client  client.NetworkClient
 	// Dynamic sizing
 	width  int
 	height int
@@ -37,9 +30,7 @@ type floatingIPsDataLoadedMsg struct {
 func NewFloatingIPsModel(nc client.NetworkClient) FloatingIPsModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	ti := textinput.New()
-	ti.Placeholder = "filter..."
-	return FloatingIPsModel{client: nc, loading: true, spinner: s, filter: ti, width: 120, height: 30}
+	return FloatingIPsModel{client: nc, loading: true, spinner: s, ft: common.NewFilterableTable(), width: 120, height: 30}
 }
 
 // Init starts async loading of floating IPs.
@@ -74,16 +65,15 @@ func (m FloatingIPsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
-		m.table = msg.tbl
-		m.allRows = msg.rows
+		m.ft.SetTable(msg.tbl, msg.rows)
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
+		m.ft.SetHeight(m.height - uiconst.TableHeightOffset)
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		if m.table.Columns() != nil {
-			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
+		if m.ft.Table.Columns() != nil {
+			m.ft.SetHeight(m.height - uiconst.TableHeightOffset)
 			m.updateTableColumns()
 		}
 		return m, nil
@@ -91,43 +81,11 @@ func (m FloatingIPsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.loading || m.err != nil {
 			return m, nil
 		}
-		// Filter mode handling
-		if !m.filterMode && msg.String() == "/" {
-			m.filterMode = true
-			m.filter.Focus()
-			return m, textinput.Blink
-		}
-		if m.filterMode && msg.String() == "esc" {
-			// clear filter
-			m.filterMode = false
-			m.filter.Blur()
-			m.filter.SetValue("")
-			m.table.SetRows(m.allRows)
-			return m, nil
-		}
-		if m.filterMode {
-			var cmd tea.Cmd
-			m.filter, cmd = m.filter.Update(msg)
-			filterVal := m.filter.Value()
-			if filterVal == "" {
-				m.table.SetRows(m.allRows)
-			} else {
-				lower := strings.ToLower(filterVal)
-				filtered := []table.Row{}
-				for _, r := range m.allRows {
-					for _, c := range r {
-						if strings.Contains(strings.ToLower(c), lower) {
-							filtered = append(filtered, r)
-							break
-						}
-					}
-				}
-				m.table.SetRows(filtered)
-			}
+		if handled, cmd := m.ft.Update(msg); handled {
 			return m, cmd
 		}
-		var cmd tea.Cmd
-		m.table, cmd = m.table.Update(msg)
+		// Normal navigation
+		cmd := m.ft.UpdateTable(msg)
 		return m, cmd
 	default:
 		if m.loading {
@@ -149,12 +107,7 @@ func (m FloatingIPsModel) View() string {
 		rows := []table.Row{{"Failed to list floating IPs: " + m.err.Error()}}
 		return common.NewTable(cols, rows).View()
 	}
-	if m.filterMode {
-		filterLine := fmt.Sprintf("Filter: %s", m.filter.View())
-		footer := "esc: clear"
-		return fmt.Sprintf("%s\n%s\n%s", filterLine, m.table.View(), footer)
-	}
-	return m.table.View()
+	return m.ft.View()
 }
 
 // updateTableColumns adjusts column widths based on the current width.
@@ -168,11 +121,11 @@ func (m *FloatingIPsModel) updateTableColumns() {
 	if fixedIPW < 10 {
 		fixedIPW = 10
 	}
-	m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "FloatingNetworkID", Width: fnetW}, {Title: "FixedIP", Width: fixedIPW}, {Title: "PortID", Width: portIDW}, {Title: "Status", Width: statusW}})
+	m.ft.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "FloatingNetworkID", Width: fnetW}, {Title: "FixedIP", Width: fixedIPW}, {Title: "PortID", Width: portIDW}, {Title: "Status", Width: statusW}})
 }
 
 // Ensure FloatingIPsModel implements tea.Model.
 // Table returns the underlying table model.
-func (m FloatingIPsModel) Table() table.Model { return m.table }
+func (m FloatingIPsModel) Table() table.Model { return m.ft.Table }
 
 var _ tea.Model = (*FloatingIPsModel)(nil)

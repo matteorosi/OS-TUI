@@ -5,21 +5,17 @@ import (
 	"fmt"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/common"
 	"ostui/internal/ui/uiconst"
-	"strings"
 )
 
-// RouterModel implements a view that lists routers and, on selection, shows the
-// interfaces attached to a router. It mirrors the behaviour of the existing
-// NetworksModel (filterable list) but adds a simple detail view.
 type RouterModel struct {
 	// UI components
-	table      table.Model // list view table
-	ifaceTable table.Model // detail view table (router interfaces)
+	ft         common.FilterableTable // list view table
+	ifaceTable table.Model            // detail view table (router interfaces)
 	loading    bool
 	err        error
 	spinner    spinner.Model
@@ -35,20 +31,15 @@ type RouterModel struct {
 	routerStatus string
 
 	// State management
-	mode       string // "list" or "detail"
-	routerID   string // selected router ID when in detail mode
-	allRows    []table.Row
-	filterMode bool
-	filter     textinput.Model
+	mode     string // "list" or "detail"
+	routerID string // selected router ID when in detail mode
 }
 
 // NewRoutersModel creates a RouterModel ready to load router data.
 func NewRoutersModel(nc client.NetworkClient) RouterModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	ti := textinput.New()
-	ti.Placeholder = "filter..."
-	return RouterModel{client: nc, loading: true, spinner: s, filter: ti, mode: "list", width: 120, height: 30}
+	return RouterModel{client: nc, loading: true, spinner: s, ft: common.NewFilterableTable(), mode: "list", width: 120, height: 30}
 }
 
 // routersListMsg is emitted when the list of routers has been fetched.
@@ -74,8 +65,6 @@ func (m RouterModel) Init() tea.Cmd {
 		cols := []table.Column{{Title: "ID", Width: uiconst.ColWidthUUID}, {Title: "Name", Width: uiconst.ColWidthName}, {Title: "Status", Width: uiconst.ColWidthStatus}}
 		rows := []table.Row{}
 		for _, r := range routers {
-			// The Router type is an alias for gophercloud's routers.Router which has a Status field.
-			// Use fmt.Sprintf to safely handle any zero values.
 			rows = append(rows, table.Row{r.ID, r.Name, fmt.Sprintf("%v", r.Status)})
 		}
 		t := table.New(
@@ -96,7 +85,6 @@ func (m RouterModel) loadInterfacesCmd(routerID string) tea.Cmd {
 		if err != nil {
 			return routerIfacesMsg{err: err}
 		}
-		// Build a simple table: Interface ID and Subnet ID.
 		cols := []table.Column{{Title: "Interface ID", Width: uiconst.ColWidthUUID}, {Title: "Subnet ID", Width: uiconst.ColWidthUUID}}
 		rows := []table.Row{}
 		for _, i := range ifaces {
@@ -122,10 +110,9 @@ func (m RouterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
-		m.table = msg.tbl
+		m.ft.SetTable(msg.tbl, msg.rows)
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
-		m.allRows = msg.rows
+		m.ft.SetHeight(m.height - uiconst.TableHeightOffset)
 		return m, nil
 	case routerIfacesMsg:
 		// Switch to detail mode after interfaces are loaded.
@@ -140,63 +127,28 @@ func (m RouterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		if m.table.Columns() != nil {
-			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
+		if m.ft.Table.Columns() != nil {
+			m.ft.SetHeight(m.height - uiconst.TableHeightOffset)
 			m.updateTableColumns()
 		}
 		return m, nil
 	case tea.KeyMsg:
 		// Global escape handling: return to list view.
 		if msg.String() == "esc" && m.mode == "detail" {
-			// Reset to list view.
 			m.mode = "list"
 			m.routerID = ""
 			m.ifaceTable = table.Model{}
 			return m, nil
 		}
-		// If we are still loading or have an error, ignore key input.
 		if m.loading || m.err != nil {
 			return m, nil
 		}
-		// Filter handling only in list mode.
 		if m.mode == "list" {
-			if !m.filterMode && msg.String() == "/" {
-				m.filterMode = true
-				m.filter.Focus()
-				return m, textinput.Blink
-			}
-			if m.filterMode && msg.String() == "esc" {
-				m.filterMode = false
-				m.filter.Blur()
-				m.filter.SetValue("")
-				m.table.SetRows(m.allRows)
-				return m, nil
-			}
-			if m.filterMode {
-				var cmd tea.Cmd
-				m.filter, cmd = m.filter.Update(msg)
-				filterVal := m.filter.Value()
-				if filterVal == "" {
-					m.table.SetRows(m.allRows)
-				} else {
-					lower := strings.ToLower(filterVal)
-					filtered := []table.Row{}
-					for _, r := range m.allRows {
-						for _, c := range r {
-							if strings.Contains(strings.ToLower(c), lower) {
-								filtered = append(filtered, r)
-								break
-							}
-						}
-					}
-					m.table.SetRows(filtered)
-				}
+			if handled, cmd := m.ft.Update(msg); handled {
 				return m, cmd
 			}
-			// Normal navigation / selection.
 			if msg.String() == "enter" {
-				// User selected a router – load its interfaces.
-				row := m.table.SelectedRow()
+				row := m.ft.SelectedRow()
 				if len(row) > 0 {
 					m.routerID = row[0]
 					m.loading = true
@@ -204,8 +156,7 @@ func (m RouterModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			}
-			var cmd tea.Cmd
-			m.table, cmd = m.table.Update(msg)
+			cmd := m.ft.UpdateTable(msg)
 			return m, cmd
 		}
 		// Detail mode – forward key handling to the interface table.
@@ -233,12 +184,7 @@ func (m RouterModel) View() string {
 		return fmt.Sprintf("Error: %s", m.err)
 	}
 	if m.mode == "list" {
-		if m.filterMode {
-			filterLine := fmt.Sprintf("Filter: %s", m.filter.View())
-			footer := "esc: clear"
-			return fmt.Sprintf("%s\n%s\n%s", filterLine, m.table.View(), footer)
-		}
-		return m.table.View()
+		return m.ft.View()
 	}
 	// Detail view – show router interfaces.
 	header := fmt.Sprintf("Router %s interfaces (press esc to go back)", m.routerID)
@@ -246,7 +192,7 @@ func (m RouterModel) View() string {
 }
 
 // Table returns the primary table (list view) – useful for navigation.
-func (m RouterModel) Table() table.Model { return m.table }
+func (m RouterModel) Table() table.Model { return m.ft.Table }
 
 // updateTableColumns adjusts column widths based on the current width.
 func (m *RouterModel) updateTableColumns() {
@@ -256,7 +202,7 @@ func (m *RouterModel) updateTableColumns() {
 	if nameW < 10 {
 		nameW = 10
 	}
-	m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "Status", Width: statusW}})
+	m.ft.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "Status", Width: statusW}})
 }
 
 var _ tea.Model = (*RouterModel)(nil)

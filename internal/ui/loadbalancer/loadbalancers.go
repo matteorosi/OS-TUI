@@ -5,25 +5,21 @@ import (
 	"fmt"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/common"
 	"ostui/internal/ui/uiconst"
-	"strings"
 )
 
 // LoadBalancersModel implements a subview for listing load balancers.
 type LoadBalancersModel struct {
-	table       table.Model
+	ft          common.FilterableTable
 	loading     bool
 	err         error
 	spinner     spinner.Model
 	client      client.LoadBalancerClient
 	width       int
 	height      int
-	allRows     []table.Row
-	filterMode  bool
-	filter      textinput.Model
 	mode        string // "list" or "detail"
 	lbID        string
 	lbName      string
@@ -34,9 +30,7 @@ type LoadBalancersModel struct {
 func NewLoadBalancersModel(lc client.LoadBalancerClient) LoadBalancersModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	ti := textinput.New()
-	ti.Placeholder = "filter..."
-	return LoadBalancersModel{client: lc, loading: true, spinner: s, filter: ti, mode: "list", width: 120, height: 30}
+	return LoadBalancersModel{client: lc, loading: true, spinner: s, ft: common.NewFilterableTable(), mode: "list", width: 120, height: 30}
 }
 
 type loadBalancersDataLoadedMsg struct {
@@ -48,6 +42,9 @@ type loadBalancersDataLoadedMsg struct {
 // Init starts async loading of load balancers.
 func (m LoadBalancersModel) Init() tea.Cmd {
 	return func() tea.Msg {
+		if m.client == nil {
+			return loadBalancersDataLoadedMsg{err: fmt.Errorf("Load Balancer service unavailable (check credentials or service endpoint)")}
+		}
 		lbs, err := m.client.ListLoadBalancers(context.Background())
 		if err != nil {
 			return loadBalancersDataLoadedMsg{err: err}
@@ -77,16 +74,15 @@ func (m LoadBalancersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
-		m.table = msg.tbl
+		m.ft.SetTable(msg.tbl, msg.rows)
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - uiconst.TableHeightOffset)
-		m.allRows = msg.rows
+		m.ft.SetHeight(m.height - uiconst.TableHeightOffset)
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		if m.table.Columns() != nil {
-			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
+		if m.ft.Table.Columns() != nil {
+			m.ft.SetHeight(m.height - uiconst.TableHeightOffset)
 			m.updateTableColumns()
 		}
 		return m, nil
@@ -109,44 +105,13 @@ func (m LoadBalancersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.loading || m.err != nil {
 			return m, nil
 		}
-		// Filter mode handling.
-		if !m.filterMode && msg.String() == "/" {
-			m.filterMode = true
-			m.filter.Focus()
-			return m, textinput.Blink
-		}
-		if m.filterMode && msg.String() == "esc" {
-			// clear filter
-			m.filterMode = false
-			m.filter.Blur()
-			m.filter.SetValue("")
-			m.table.SetRows(m.allRows)
-			return m, nil
-		}
-		if m.filterMode {
-			var cmd tea.Cmd
-			m.filter, cmd = m.filter.Update(msg)
-			filterVal := m.filter.Value()
-			if filterVal == "" {
-				m.table.SetRows(m.allRows)
-			} else {
-				lower := strings.ToLower(filterVal)
-				filtered := []table.Row{}
-				for _, r := range m.allRows {
-					for _, c := range r {
-						if strings.Contains(strings.ToLower(c), lower) {
-							filtered = append(filtered, r)
-							break
-						}
-					}
-				}
-				m.table.SetRows(filtered)
-			}
+		// Filter handling delegated to ft.
+		if handled, cmd := m.ft.Update(msg); handled {
 			return m, cmd
 		}
 		// Normal navigation.
 		if msg.String() == "enter" {
-			row := m.table.SelectedRow()
+			row := m.ft.SelectedRow()
 			if len(row) > 0 {
 				m.lbID = row[0]
 				m.lbName = row[1]
@@ -156,8 +121,7 @@ func (m LoadBalancersModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
-		var cmd tea.Cmd
-		m.table, cmd = m.table.Update(msg)
+		cmd := m.ft.UpdateTable(msg)
 		return m, cmd
 	default:
 		if m.loading {
@@ -180,16 +144,11 @@ func (m LoadBalancersModel) View() string {
 	if m.mode == "detail" && m.detailModel != nil {
 		return m.detailModel.View()
 	}
-	if m.filterMode {
-		filterLine := fmt.Sprintf("Filter: %s", m.filter.View())
-		footer := "esc: clear"
-		return fmt.Sprintf("%s\n%s\n%s", filterLine, m.table.View(), footer)
-	}
-	return m.table.View()
+	return m.ft.View()
 }
 
 // Table returns the primary table model (list view).
-func (m LoadBalancersModel) Table() table.Model { return m.table }
+func (m LoadBalancersModel) Table() table.Model { return m.ft.Table }
 
 func (m *LoadBalancersModel) updateTableColumns() {
 	idW := uiconst.ColWidthUUID
@@ -200,7 +159,7 @@ func (m *LoadBalancersModel) updateTableColumns() {
 	if nameW < 10 {
 		nameW = 10
 	}
-	m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "VIP Address", Width: vipW}, {Title: "Provisioning", Width: provW}, {Title: "Operating", Width: operW}})
+	m.ft.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "VIP Address", Width: vipW}, {Title: "Provisioning", Width: provW}, {Title: "Operating", Width: operW}})
 }
 
 var _ tea.Model = (*LoadBalancersModel)(nil)

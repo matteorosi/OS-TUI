@@ -2,13 +2,14 @@ package identity
 
 import (
 	"errors"
+
 	"ostui/internal/ui/uiconst"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/tokens"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/users"
@@ -74,8 +75,8 @@ func TestProjectsModelSuccess(t *testing.T) {
 	// Simulate loaded state.
 	m.loading = false
 	rows := []table.Row{{"proj-1", "proj1", "domain-1"}}
-	m.table = newProjectsTable(rows)
-	m.allRows = rows
+	m.ft.Table = newProjectsTable(rows)
+	m.ft.AllRows = rows
 	view := m.View()
 	if !strings.Contains(view, "proj1") {
 		t.Fatalf("expected project name in view, got %s", view)
@@ -98,11 +99,13 @@ func TestProjectsModelFilterMode(t *testing.T) {
 	m := NewProjectsModel(mock)
 	m.loading = false
 	rows := []table.Row{{"proj-1", "proj1", "domain-1"}}
-	m.table = newProjectsTable(rows)
-	m.allRows = rows
-	// Enable filter mode.
-	m.filterMode = true
-	m.filter = textinput.New()
+	m.ft.Table = newProjectsTable(rows)
+	m.ft.AllRows = rows
+	// Activate filter mode via ft.Update with '/' key.
+	handled, _ := m.ft.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	if !handled {
+		t.Fatalf("filter mode not activated")
+	}
 	view := m.View()
 	if !strings.Contains(view, "Filter:") {
 		t.Fatalf("expected filter line in view, got %s", view)

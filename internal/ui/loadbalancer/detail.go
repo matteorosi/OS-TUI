@@ -54,6 +54,9 @@ func NewLoadBalancerDetailModel(lc client.LoadBalancerClient, lbID string, lbNam
 // Init starts async loading of listeners and pools.
 func (m LoadBalancerDetailModel) Init() tea.Cmd {
 	return func() tea.Msg {
+		if m.client == nil {
+			return loadBalancerDetailDataLoadedMsg{err: fmt.Errorf("Load Balancer service unavailable")}
+		}
 		// Load listeners.
 		lst, err := m.client.ListListeners(context.Background(), m.lbID)
 		if err != nil {

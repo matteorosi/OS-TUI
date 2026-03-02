@@ -82,5 +82,17 @@ func (m FormModel) View() string {
 	return lipgloss.NewStyle().Render(b.String())
 }
 
+// Values returns the current values of all inputs.
+func (m FormModel) Values() []string {
+	vals := make([]string, len(m.inputs))
+	for i, inp := range m.inputs {
+		vals[i] = inp.Value()
+	}
+	return vals
+}
+
+// Submitted returns whether the form has been submitted.
+func (m FormModel) Submitted() bool { return m.submitted }
+
 // Ensure FormModel implements tea.Model.
 var _ tea.Model = (*FormModel)(nil)

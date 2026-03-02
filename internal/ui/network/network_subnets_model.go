@@ -4,25 +4,21 @@ import (
 	"fmt"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/table"
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"ostui/internal/client"
+	"ostui/internal/ui/common"
 	"ostui/internal/ui/uiconst"
-	"strings"
 )
 
 type NetworkSubnetsModel struct {
-	table      table.Model
-	loading    bool
-	err        error
-	spinner    spinner.Model
-	client     client.NetworkClient
-	networkID  string
-	allRows    []table.Row
-	filterMode bool
-	filter     textinput.Model
-	width      int
-	height     int
+	ft        common.FilterableTable
+	loading   bool
+	err       error
+	spinner   spinner.Model
+	client    client.NetworkClient
+	networkID string
+	width     int
+	height    int
 }
 
 // ResourceID returns the network ID.
@@ -41,9 +37,7 @@ type networkSubnetsDataLoadedMsg struct {
 func NewNetworkSubnetsModel(nc client.NetworkClient, networkID string) NetworkSubnetsModel {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	ti := textinput.New()
-	ti.Placeholder = "filter..."
-	return NetworkSubnetsModel{client: nc, loading: true, spinner: s, networkID: networkID, filter: ti, width: 120, height: 30}
+	return NetworkSubnetsModel{client: nc, loading: true, spinner: s, networkID: networkID, ft: common.NewFilterableTable(), width: 120, height: 30}
 }
 
 // Init starts async loading of subnets for the specified network.
@@ -81,60 +75,27 @@ func (m NetworkSubnetsModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			return m, nil
 		}
-		m.table = msg.tbl
-		m.allRows = msg.rows
+		m.ft.SetTable(msg.tbl, msg.rows)
 		m.updateTableColumns()
-		m.table.SetHeight(m.height - 6)
+		m.ft.SetHeight(m.height - uiconst.TableHeightOffset)
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		if !m.loading {
 			m.updateTableColumns()
-			m.table.SetHeight(m.height - uiconst.TableHeightOffset)
+			m.ft.SetHeight(m.height - uiconst.TableHeightOffset)
 		}
 		return m, nil
 	case tea.KeyMsg:
 		if m.loading || m.err != nil {
 			return m, nil
 		}
-		// Filter mode handling
-		if !m.filterMode && msg.String() == "/" {
-			m.filterMode = true
-			m.filter.Focus()
-			return m, textinput.Blink
-		}
-		if m.filterMode && msg.String() == "esc" {
-			// clear filter
-			m.filterMode = false
-			m.filter.Blur()
-			m.filter.SetValue("")
-			m.table.SetRows(m.allRows)
-			return m, nil
-		}
-		if m.filterMode {
-			var cmd tea.Cmd
-			m.filter, cmd = m.filter.Update(msg)
-			filterVal := m.filter.Value()
-			if filterVal == "" {
-				m.table.SetRows(m.allRows)
-			} else {
-				lower := strings.ToLower(filterVal)
-				filtered := []table.Row{}
-				for _, r := range m.allRows {
-					for _, c := range r {
-						if strings.Contains(strings.ToLower(c), lower) {
-							filtered = append(filtered, r)
-							break
-						}
-					}
-				}
-				m.table.SetRows(filtered)
-			}
+		if handled, cmd := m.ft.Update(msg); handled {
 			return m, cmd
 		}
 		var cmd tea.Cmd
-		m.table, cmd = m.table.Update(msg)
+		m.ft.Table, cmd = m.ft.Table.Update(msg)
 		return m, cmd
 	default:
 		if m.loading {
@@ -156,24 +117,24 @@ func (m NetworkSubnetsModel) View() string {
 		rows := []table.Row{{"Failed to list subnets: " + m.err.Error()}}
 		return table.New(table.WithColumns(cols), table.WithRows(rows)).View()
 	}
-	return fmt.Sprintf("%s\n[g] graph  [esc] back", m.table.View())
+	return fmt.Sprintf("%s\n[g] graph  [esc] back", m.ft.View())
 }
 
 // Table returns the underlying table model.
-func (m NetworkSubnetsModel) Table() table.Model { return m.table }
+func (m NetworkSubnetsModel) Table() table.Model { return m.ft.Table }
 
 func (m *NetworkSubnetsModel) updateTableColumns() {
-	if len(m.table.Columns()) > 0 {
+	if len(m.ft.Table.Columns()) > 0 {
 		// Fixed widths
 		idW := uiconst.ColWidthUUID
 		cidrW := uiconst.ColWidthCIDR
 		ipverW := uiconst.ColWidthIPVersion
 		// Remaining width for Name column
-		nameW := m.width - idW - cidrW - ipverW - 6
+		nameW := m.width - idW - cidrW - ipverW - uiconst.TableHeightOffset
 		if nameW < 10 {
 			nameW = 10
 		}
-		m.table.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "CIDR", Width: cidrW}, {Title: "IPVer", Width: ipverW}})
+		m.ft.SetColumns([]table.Column{{Title: "ID", Width: idW}, {Title: "Name", Width: nameW}, {Title: "CIDR", Width: cidrW}, {Title: "IPVer", Width: ipverW}})
 	}
 }
 

@@ -1,9 +1,11 @@
 package ui
 
 import (
+	"context"
 	"fmt"
-	"sort"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -11,7 +13,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/utils/openstack/clientconfig"
+	appcache "ostui/internal/cache"
 	"ostui/internal/client"
+	"ostui/internal/ui/common"
 	"ostui/internal/ui/compute"
 	"ostui/internal/ui/dns"
 	"ostui/internal/ui/graph"
@@ -59,7 +63,15 @@ const (
 	stateGraph       = "graph"
 	stateTopology    = "topology"
 	stateSearch      = "search"
+	stateAction      = "action"
+	stateConfirm     = "confirm"
+	stateInput       = "input"
 )
+
+type actionResultMsg struct {
+	success bool
+	message string
+}
 
 // AppModel is the root model of the TUI, managing a simple state machine.
 type AppModel struct {
@@ -68,6 +80,7 @@ type AppModel struct {
 	computeClient  client.ComputeClient
 	networkClient  client.NetworkClient
 	storageClient  client.StorageClient
+	cache          *appcache.Cache
 	identityClient client.IdentityClient
 	imageClient    client.ImageClient
 	limitsClient   client.LimitsClient
@@ -106,6 +119,16 @@ type AppModel struct {
 	// tabMatches holds autocomplete suggestions for the current prefix.
 	tabMatches []string
 	tabIndex   int
+	// Action handling fields
+	actionMenu          *common.ActionMenuModel
+	actionTarget        string
+	actionResource      string
+	confirmModal        *common.ConfirmModel
+	pendingAction       *common.ActionItem
+	pendingInput        string
+	actionResult        string
+	actionResultSuccess bool
+	inputModel          *common.FormModel
 }
 
 // NewModel creates a new AppModel with a sidebar list.
@@ -180,7 +203,25 @@ func NewModel(provider *gophercloud.ProviderClient, cloudName string, compute cl
 		"lb": "Load Balancers", "loadbalancers": "Load Balancers", "topology": "Topology", "topo": "Topology",
 		"search": "__search__",
 	}
-	return AppModel{provider: provider, cloudName: cloudName, computeClient: compute, networkClient: network, storageClient: storage, identityClient: identity, imageClient: image, limitsClient: limits, dnsClient: dns, lbClient: lb, sidebar: l, state: stateSidebar, prevState: "", commandBar: cmdBar, commandMap: cmdMap}
+	c := appcache.NewCache(5 * time.Minute)
+	return AppModel{
+		provider:       provider,
+		cloudName:      cloudName,
+		computeClient:  client.NewCachedComputeClient(compute, c),
+		networkClient:  client.NewCachedNetworkClient(network, c),
+		storageClient:  client.NewCachedStorageClient(storage, c),
+		identityClient: identity,
+		imageClient:    image,
+		limitsClient:   limits,
+		dnsClient:      dns,
+		lbClient:       lb,
+		cache:          c,
+		sidebar:        l,
+		state:          stateSidebar,
+		prevState:      "",
+		commandBar:     cmdBar,
+		commandMap:     cmdMap,
+	}
 }
 
 // navigationMap returns a map of sidebar titles to model constructors.
@@ -230,6 +271,42 @@ func (m *AppModel) navigateTo(section string) {
 		return
 	}
 	// No submodel for unknown sections.
+}
+
+// prefetchMap defines which resources to warm when a section is opened.
+var prefetchMap = map[string][]string{
+	"Servers":      {"Networks", "Volumes", "Floating IPs"},
+	"Networks":     {"Subnets", "Routers", "Floating IPs"},
+	"Floating IPs": {"Networks"},
+	"Routers":      {"Networks", "Subnets"},
+	"Subnets":      {"Networks"},
+}
+
+// triggerPrefetch fires background goroutines to warm the cache for sections
+// related to the one just opened. Safe to call from Update(); goroutines are
+// fire-and-forget — they write into the thread-safe cache.
+func (m AppModel) triggerPrefetch(section string) {
+	targets, ok := prefetchMap[section]
+	if !ok {
+		return
+	}
+	for _, t := range targets {
+		target := t
+		go func() {
+			switch target {
+			case "Networks":
+				_, _ = m.networkClient.ListNetworks()
+			case "Subnets":
+				_, _ = m.networkClient.ListSubnets()
+			case "Floating IPs":
+				_, _ = m.networkClient.ListFloatingIPs()
+			case "Routers":
+				_, _ = m.networkClient.ListRouters(context.Background())
+			case "Volumes":
+				_, _ = m.storageClient.ListVolumes()
+			}
+		}()
+	}
 }
 
 // Update implements tea.Model.
@@ -290,6 +367,8 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Batch(cmds...)
 	case tea.KeyMsg:
+		// Clear any previous action result on any key press
+		m.actionResult = ""
 		// Forward ALL keys to search model when in search state.
 		if m.state == stateSearch && m.searchModel != nil {
 			var cmd tea.Cmd
@@ -411,6 +490,49 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, m.graphModel.Init()
 			}
 
+		case "a":
+			if m.state == stateMain && m.mainModel != nil {
+				var actions []common.ActionItem
+				var id string
+				switch model := m.mainModel.(type) {
+				case compute.InstancesModel:
+					row := model.Table().SelectedRow()
+					if len(row) > 0 {
+						id = row[0]
+						actions = []common.ActionItem{{Key: "start", Label: "Start", Destructive: false}, {Key: "stop", Label: "Stop", Destructive: true}, {Key: "reboot", Label: "Reboot", Destructive: false}, {Key: "delete", Label: "Delete", Destructive: true}}
+						m.actionResource = "instance"
+					}
+
+				case storage.VolumesModel:
+					row := model.Table().SelectedRow()
+					if len(row) > 0 {
+						id = row[0]
+						actions = []common.ActionItem{{Key: "delete", Label: "Delete", Destructive: true}, {Key: "extend", Label: "Extend Size", Destructive: false}}
+						m.actionResource = "volume"
+					}
+
+				case network.NetworksModel:
+					row := model.Table().SelectedRow()
+					if len(row) > 0 {
+						id = row[0]
+						actions = []common.ActionItem{{Key: "delete", Label: "Delete", Destructive: true}}
+					}
+				case network.FloatingIPsModel:
+					row := model.Table().SelectedRow()
+					if len(row) > 0 {
+						id = row[0]
+						actions = []common.ActionItem{{Key: "associate", Label: "Associate", Destructive: false}, {Key: "disassociate", Label: "Disassociate", Destructive: false}, {Key: "delete", Label: "Delete/Release", Destructive: true}}
+					}
+				default:
+					// No actions for other models
+				}
+				if id != "" && len(actions) > 0 {
+					m.actionTarget = id
+					am := common.NewActionMenu("Actions", actions)
+					m.actionMenu = &am
+					m.state = stateAction
+				}
+			}
 		case "enter":
 			if m.state == stateSidebar {
 				if i, ok := m.sidebar.SelectedItem().(item); ok {
@@ -435,6 +557,7 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 					// If a submodel was created, invoke its Init to start async loading.
 					if m.mainModel != nil {
+						m.triggerPrefetch(i.title)
 						return m, m.mainModel.Init()
 					}
 					return m, nil
@@ -593,9 +716,6 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
-	}
-	// Handle custom messages
-	switch msg := msg.(type) {
 	case compute.OpenLogsMsg:
 		m.logsModel = compute.NewLogsModel(m.computeClient, msg.ServerID)
 		m.state = stateLogs
@@ -622,126 +742,527 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = stateSidebar
 		m.shellModel = nil
 		return m, nil
-	}
-	// Command mode handling
-	if m.state == stateCommand {
-		// handle command mode key events
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			{
-				switch msg.String() {
-				case "esc":
-					// exit command mode
-					m.state = m.prevState
-					m.prevState = ""
-					m.commandBar.Blur()
-					m.commandBar.SetValue("")
-					// reset tab autocomplete state
-					m.tabMatches = nil
-					m.tabIndex = 0
-					return m, nil
-				case "enter":
-					cmd := strings.TrimSpace(m.commandBar.Value())
-					// Shell passthrough command mode: prefix '!'
-					if strings.HasPrefix(cmd, "!") {
-						command := strings.TrimPrefix(cmd, "!")
-						sm := shell.NewShellModel(m.cloudName, command)
-						m.shellModel = &sm
-						m.state = stateShell
-						m.commandBar.SetValue("")
-						m.commandBar.Blur()
-						// reset tab autocomplete state
-						m.tabMatches = nil
-						m.tabIndex = 0
-						return m, m.shellModel.Init()
-					}
-					if cmd == "topology" || cmd == "topo" {
-						// Open topology view using navigateTo
-						m.navigateTo("Topology")
-						m.commandBar.SetValue("")
-						m.commandBar.Blur()
-						// reset tab autocomplete state
-						m.tabMatches = nil
-						m.tabIndex = 0
-						if m.topologyModel != nil {
-							return m, m.topologyModel.Init()
-						}
-						return m, nil
-					}
-					if cmd == "__search__" {
-						sm := search.NewSearchModel(m.computeClient, m.networkClient, m.storageClient, m.imageClient, m.width, m.height)
-						m.searchModel = &sm
-						m.state = stateSearch
-						m.commandBar.SetValue("")
-						m.commandBar.Blur()
-						// reset tab autocomplete state
-						m.tabMatches = nil
-						m.tabIndex = 0
-						return m, sm.Init()
-					}
-					if section, ok := m.commandMap[cmd]; ok {
-						if section == "__quit__" {
-							return m, tea.Quit
-						}
-						m.navigateTo(section)
-						if section == "Topology" {
-							m.commandBar.SetValue("")
-							m.commandBar.Blur()
-							// reset tab autocomplete state
-							m.tabMatches = nil
-							m.tabIndex = 0
-							if m.topologyModel != nil {
-								return m, m.topologyModel.Init()
-							}
-							return m, nil
-						}
-						m.state = stateMain
-						m.commandBar.SetValue("")
-						m.commandBar.Blur()
-						// reset tab autocomplete state
-						m.tabMatches = nil
-						m.tabIndex = 0
-						return m, m.mainModel.Init()
-					}
-
-					// unknown command: clear input
-					m.commandBar.SetValue("")
-					// reset tab autocomplete state
-					m.tabMatches = nil
-					m.tabIndex = 0
-					return m, nil
-				case "tab":
-					prefix := strings.TrimSpace(m.commandBar.Value())
-					// Collect and sort all matches
-					var matches []string
-					for k := range m.commandMap {
-						if strings.HasPrefix(k, prefix) {
-							matches = append(matches, k)
-						}
-					}
-					sort.Strings(matches)
-					if len(matches) == 0 {
-						return m, nil
-					}
-					// If prefix changed, reset cycle
-					if len(m.tabMatches) == 0 || m.commandBar.Value() != m.tabMatches[m.tabIndex] {
-						m.tabMatches = matches
-						m.tabIndex = 0
-					} else {
-						m.tabIndex = (m.tabIndex + 1) % len(m.tabMatches)
-					}
-					m.commandBar.SetValue(m.tabMatches[m.tabIndex])
-					return m, nil
-				default:
-					var cmd tea.Cmd
-					m.commandBar, cmd = m.commandBar.Update(msg)
-					return m, cmd
-				}
-			}
+	case actionResultMsg:
+		m.actionResult = msg.message
+		m.actionResultSuccess = msg.success
+		m.pendingAction = nil
+		m.actionTarget = ""
+		m.actionResource = ""
+		m.pendingInput = ""
+		m.state = stateMain
+		if m.mainModel != nil {
+			return m, m.mainModel.Init()
 		}
-		// ignore other messages
 		return m, nil
 	}
+	// Handle action menu, confirm modal, input form, and action result messages
+	if m.state == stateAction && m.actionMenu != nil {
+		var cmd tea.Cmd
+		var newModel tea.Model
+		newModel, cmd = (*m.actionMenu).Update(msg)
+		if am, ok := newModel.(common.ActionMenuModel); ok {
+			*m.actionMenu = am
+		}
+		if m.actionMenu.IsDone() {
+			selected := m.actionMenu.Selected()
+			if selected != nil {
+				m.pendingAction = selected
+				if selected.Destructive {
+					confirmMsg := fmt.Sprintf("Confirm %s on %s? (y/n)", selected.Label, m.actionTarget)
+					cm := common.NewConfirm(confirmMsg)
+					m.confirmModal = &cm
+					m.state = stateConfirm
+				} else {
+					if selected.Key == "extend" {
+						fm := common.NewForm([]string{"New size (GB)"})
+						m.inputModel = &fm
+						m.state = stateInput
+					} else if selected.Key == "associate" {
+						fm := common.NewForm([]string{"Port ID"})
+						m.inputModel = &fm
+						m.state = stateInput
+					} else {
+						return m, executeAction(m)
+					}
+				}
+			} else {
+				m.state = stateMain
+			}
+			m.actionMenu = nil
+		}
+		return m, cmd
+	}
+	if m.state == stateConfirm && m.confirmModal != nil {
+		var cmd tea.Cmd
+		var newModel tea.Model
+		newModel, cmd = (*m.confirmModal).Update(msg)
+		if cm, ok := newModel.(common.ConfirmModel); ok {
+			*m.confirmModal = cm
+		}
+		if m.confirmModal.Done() {
+			if m.confirmModal.Result() == "Yes" {
+				return m, executeAction(m)
+			} else {
+				m.state = stateMain
+				m.confirmModal = nil
+				m.pendingAction = nil
+				m.actionTarget = ""
+				m.actionResource = ""
+			}
+		}
+		return m, cmd
+	}
+	if m.state == stateInput && m.inputModel != nil {
+		var cmd tea.Cmd
+		var newModel tea.Model
+		newModel, cmd = (*m.inputModel).Update(msg)
+		if fm, ok := newModel.(common.FormModel); ok {
+			*m.inputModel = fm
+		}
+		if m.inputModel.Submitted() {
+			vals := m.inputModel.Values()
+			if len(vals) > 0 {
+				m.pendingInput = vals[0]
+			}
+			m.inputModel = nil
+			return m, executeAction(m)
+		}
+		return m, cmd
+	}
+
+	// Handle custom messages
+	/*
+	           case compute.OpenLogsMsg:
+	               m.logsModel = compute.NewLogsModel(m.computeClient, msg.ServerID)
+	               m.state = stateLogs
+	               return m, m.logsModel.Init()
+	           case compute.GoBackMsg:
+	               if m.state == stateLogs {
+	                   m.state = stateDetail
+	                   m.logsModel = nil
+	                   return m, nil
+	               } else if m.state == stateDetail && m.detailModel != nil {
+	                   var cmd tea.Cmd
+	                   m.detailModel, cmd = m.detailModel.Update(msg)
+	                   return m, cmd
+	               } else if m.state == stateGraph {
+	                   m.state = stateDetail
+	                   m.graphModel = nil
+	                   return m, nil
+	               }
+	           case topology.CloseMsg:
+	               m.state = stateSidebar
+	               m.topologyModel = nil
+	               return m, nil
+	           case shell.CloseMsg:
+	               m.state = stateSidebar
+	               m.shellModel = nil
+	               return m, nil
+	           case actionResultMsg:
+	               // Set result message and success flag
+	               m.actionResult = msg.message
+	               m.actionResultSuccess = msg.success
+	               // Reset pending state
+	               m.pendingAction = nil
+	               m.actionTarget = ""
+	               m.actionResource = ""
+	               m.pendingInput = ""
+	               // Return to main view and reload list
+	               m.state = stateMain
+	               if m.mainModel != nil {
+	                   return m, m.mainModel.Init()
+	               }
+	               return m, nil
+	           }
+	           // Command mode handling
+	   	// Command mode handling
+	   	if m.state == stateCommand {
+	   		// handle command mode key events
+	   		switch msg := msg.(type) {
+	   		case tea.KeyMsg:
+	   			{
+	   				switch msg.String() {
+	   				case "esc":
+	   					// exit command mode
+	   					m.state = m.prevState
+	   					m.prevState = ""
+	   					m.commandBar.Blur()
+	   					m.commandBar.SetValue("")
+	   					// reset tab autocomplete state
+	   					m.tabMatches = nil
+	   					m.tabIndex = 0
+	   					return m, nil
+	   				case "enter":
+	   					cmd := strings.TrimSpace(m.commandBar.Value())
+	   					// Shell passthrough command mode: prefix '!'
+	   					if strings.HasPrefix(cmd, "!") {
+	   						command := strings.TrimPrefix(cmd, "!")
+	   						sm := shell.NewShellModel(m.cloudName, command)
+	   						m.shellModel = &sm
+	   						m.state = stateShell
+	   						m.commandBar.SetValue("")
+	   						m.commandBar.Blur()
+	   						// reset tab autocomplete state
+	   						m.tabMatches = nil
+	   						m.tabIndex = 0
+	   						return m, m.shellModel.Init()
+	   					}
+	   					if cmd == "topology" || cmd == "topo" {
+	   						// Open topology view using navigateTo
+	   						m.navigateTo("Topology")
+	   						m.commandBar.SetValue("")
+	   						m.commandBar.Blur()
+	   						// reset tab autocomplete state
+	   						m.tabMatches = nil
+	   						m.tabIndex = 0
+	   						if m.topologyModel != nil {
+	   							return m, m.topologyModel.Init()
+	   						}
+	   						return m, nil
+	   					}
+	   					if cmd == "__search__" {
+	   						sm := search.NewSearchModel(m.computeClient, m.networkClient, m.storageClient, m.imageClient, m.width, m.height)
+	   						m.searchModel = &sm
+	   						m.state = stateSearch
+	   						m.commandBar.SetValue("")
+	   						m.commandBar.Blur()
+	   						// reset tab autocomplete state
+	   						m.tabMatches = nil
+	   						m.tabIndex = 0
+	   						return m, sm.Init()
+	   					}
+	   					if section, ok := m.commandMap[cmd]; ok {
+	   						if section == "__quit__" {
+	   							return m, tea.Quit
+	   						}
+	   						m.navigateTo(section)
+	   						if section == "Topology" {
+	   							m.commandBar.SetValue("")
+	   							m.commandBar.Blur()
+	   							// reset tab autocomplete state
+	   							m.tabMatches = nil
+	   							m.tabIndex = 0
+	   							if m.topologyModel != nil {
+	   								return m, m.topologyModel.Init()
+	   							}
+	   							return m, nil
+	   						}
+	   						m.state = stateMain
+	   						m.commandBar.SetValue("")
+	   						m.commandBar.Blur()
+	   						// reset tab autocomplete state
+	   						m.tabMatches = nil
+	   						m.tabIndex = 0
+	   						return m, m.mainModel.Init()
+	   					}
+
+	   					// unknown command: clear input
+	   					m.commandBar.SetValue("")
+	   					// reset tab autocomplete state
+	   					m.tabMatches = nil
+	   					m.tabIndex = 0
+	   					return m, nil
+	   				case "tab":
+	   					prefix := strings.TrimSpace(m.commandBar.Value())
+	   					// Collect and sort all matches
+	   					var matches []string
+	   					for k := range m.commandMap {
+	   						if strings.HasPrefix(k, prefix) {
+	   							matches = append(matches, k)
+	   						}
+	   					}
+	   					sort.Strings(matches)
+	   					if len(matches) == 0 {
+	   						return m, nil
+	   					}
+	   					// If prefix changed, reset cycle
+	   					if len(m.tabMatches) == 0 || m.commandBar.Value() != m.tabMatches[m.tabIndex] {
+	   						m.tabMatches = matches
+	   						m.tabIndex = 0
+	   					} else {
+	   						m.tabIndex = (m.tabIndex + 1) % len(m.tabMatches)
+	   					}
+	   					m.commandBar.SetValue(m.tabMatches[m.tabIndex])
+	   					return m, nil
+	   				default:
+	   					var cmd tea.Cmd
+	   					m.commandBar, cmd = m.commandBar.Update(msg)
+	   					return m, cmd
+	   				}
+	   			}
+	   			// ignore other messages
+
+	   	// When in sidebar state, forward updates to the list component.
+	   	if m.state == stateSidebar {
+	   		var cmd tea.Cmd
+	   		m.sidebar, cmd = m.sidebar.Update(msg)
+	   		return m, cmd
+	   	}
+
+	   	if m.state == stateCloudSelect {
+	   		var cmd tea.Cmd
+	   		m.cloudList, cmd = m.cloudList.Update(msg)
+	   		if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "enter" {
+	   			if _, ok := m.cloudList.SelectedItem().(cloudItem); ok {
+	   				m.state = stateSidebar
+	   			}
+	   		}
+	   		return m, cmd
+	   	}
+	   	if m.state == stateMain && m.mainModel != nil {
+	   		var cmd tea.Cmd
+	   		m.mainModel, cmd = m.mainModel.Update(msg)
+	   		return m, cmd
+	   	}
+	   	if m.state == stateDetail && m.detailModel != nil {
+	   		var cmd tea.Cmd
+	   		m.detailModel, cmd = m.detailModel.Update(msg)
+	   		return m, cmd
+	   	}
+	   	if m.state == stateGraph && m.graphModel != nil {
+	   		var cmd tea.Cmd
+	   		m.graphModel, cmd = m.graphModel.Update(msg)
+	   		return m, cmd
+	   	}
+	   	if m.state == stateTopology && m.topologyModel != nil {
+	   		var cmd tea.Cmd
+	   		var newModel tea.Model
+	   		newModel, cmd = m.topologyModel.Update(msg)
+	   		if tm, ok := newModel.(topology.TopologyModel); ok {
+	   			*m.topologyModel = tm
+	   		}
+	   		return m, cmd
+	   	}
+	   	if m.state == stateShell && m.shellModel != nil {
+	   		var cmd tea.Cmd
+	   		var newModel tea.Model
+	   		newModel, cmd = m.shellModel.Update(msg)
+	   		if sm, ok := newModel.(shell.ShellModel); ok {
+	   			m.shellModel = &sm
+	   		} else {
+	   			m.shellModel = nil
+	   		}
+	   		return m, cmd
+	   	}
+	   	if m.state == stateLogs && m.logsModel != nil {
+	   		var cmd tea.Cmd
+	   		m.logsModel, cmd = m.logsModel.Update(msg)
+	   		return m, cmd
+	   	}
+	   	// Catch-all: forward any unhandled message to search model.
+	   	if m.state == stateSearch && m.searchModel != nil {
+	   		var cmd tea.Cmd
+	   		var newModel tea.Model
+	   		newModel, cmd = m.searchModel.Update(msg)
+	   		if sm, ok := newModel.(search.SearchModel); ok {
+	   			m.searchModel = &sm
+	   		}
+	   		return m, cmd
+	   	}
+	   	// Catch-all: forward any unhandled message to search model.
+	   	if m.state == stateSearch && m.searchModel != nil {
+	   		var cmd tea.Cmd
+	   		var newModel tea.Model
+	   		newModel, cmd = m.searchModel.Update(msg)
+	   		if sm, ok := newModel.(search.SearchModel); ok {
+	   			m.searchModel = &sm
+	   		}
+	   		return m, cmd
+	   	}
+	   	// When in cloud select state, forward updates to the cloud list component.
+	   	//if m.state == stateCloudSelect {
+	   	//	var cmd tea.Cmd
+	   	//	m.cloudList, cmd = m.cloudList.Update(msg)
+	   	//	// If Enter pressed, handle selection.
+	   	//	if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "enter" {
+	   	//		if _, ok := m.cloudList.SelectedItem().(cloudItem); ok {
+	   	//			cloudsPath := os.Getenv("OS_CLIENT_CONFIG_FILE")
+	   	//			authOpts, err := config.LoadAuthOptions(i.name, cloudsPath)
+	   	//			if err == nil {
+	   	//				provider, err := openstack.AuthenticatedClient(authOpts)
+	   	//				if err == nil {
+	   	//					m.provider = provider
+	   	//					// Recreate clients.
+	   	//					if computeClient, err := client.NewComputeClient(authOpts); err == nil {
+	   	//						m.computeClient = computeClient
+	   	//					}
+	   	//					if networkClient, err := client.NewNetworkClient(authOpts); err == nil {
+	   	//						m.networkClient = networkClient
+	   	//					}
+	   	//					if storageClient, err := client.NewStorageClient(authOpts); err == nil {
+	   	//						m.storageClient = storageClient
+	   	//					}
+	   	//					if identityClient, err := client.NewIdentityClient(authOpts); err == nil {
+	   	//						m.identityClient = identityClient
+	   	//					}
+	   	//				}
+	   	//				}
+	   	//				// Return to sidebar.
+	   	//				m.state = stateSidebar
+	   	//				m.modalActive = false
+	   	//				return m, nil
+	   	//			}
+	   	//		}
+	   	//	return m, cmd
+	   	//}
+
+	   	// When in the main view, forward all messages to the active submodel.
+	   	//if m.state == stateMain && m.mainModel != nil {
+	   	//	var cmd tea.Cmd
+	   	//	m.mainModel, cmd = m.mainModel.Update(msg)
+	   	//	return m, cmd
+	   	//}
+	   	return m, nil
+	   }
+
+	   	switch msg := msg.(type) {
+	   	case compute.OpenLogsMsg:
+	   		m.logsModel = compute.NewLogsModel(m.computeClient, msg.ServerID)
+	   		m.state = stateLogs
+	   		return m, m.logsModel.Init()
+	   	case compute.GoBackMsg:
+	   		if m.state == stateLogs {
+	   			m.state = stateDetail
+	   			m.logsModel = nil
+	   			return m, nil
+	   		} else if m.state == stateDetail && m.detailModel != nil {
+	   			var cmd tea.Cmd
+	   			m.detailModel, cmd = m.detailModel.Update(msg)
+	   			return m, cmd
+	   		} else if m.state == stateGraph {
+	   			m.state = stateDetail
+	   			m.graphModel = nil
+	   			return m, nil
+	   		}
+	   	case topology.CloseMsg:
+	   		m.state = stateSidebar
+	   		m.topologyModel = nil
+	   		return m, nil
+	   	case shell.CloseMsg:
+	   		m.state = stateSidebar
+	   		m.shellModel = nil
+	   		return m, nil
+	   	}
+	   	// Command mode handling
+	   	if m.state == stateCommand {
+	   		// handle command mode key events
+	   		switch msg := msg.(type) {
+	   		case tea.KeyMsg:
+	   			// Clear any previous action result on any key press
+	   			m.actionResult = ""
+	   			{
+	   				switch msg.String() {
+	   				case "esc":
+	   					// exit command mode
+	   					m.state = m.prevState
+	   					m.prevState = ""
+	   					m.commandBar.Blur()
+	   					m.commandBar.SetValue("")
+	   					// reset tab autocomplete state
+	   					m.tabMatches = nil
+	   					m.tabIndex = 0
+	   					return m, nil
+	   				case "enter":
+	   					cmd := strings.TrimSpace(m.commandBar.Value())
+	   					// Shell passthrough command mode: prefix '!'
+	   					if strings.HasPrefix(cmd, "!") {
+	   						command := strings.TrimPrefix(cmd, "!")
+	   						sm := shell.NewShellModel(m.cloudName, command)
+	   						m.shellModel = &sm
+	   						m.state = stateShell
+	   						m.commandBar.SetValue("")
+	   						m.commandBar.Blur()
+	   						// reset tab autocomplete state
+	   						m.tabMatches = nil
+	   						m.tabIndex = 0
+	   						return m, m.shellModel.Init()
+	   					}
+	   					if cmd == "topology" || cmd == "topo" {
+	   						// Open topology view using navigateTo
+	   						m.navigateTo("Topology")
+	   						m.commandBar.SetValue("")
+	   						m.commandBar.Blur()
+	   						// reset tab autocomplete state
+	   						m.tabMatches = nil
+	   						m.tabIndex = 0
+	   						if m.topologyModel != nil {
+	   							return m, m.topologyModel.Init()
+	   						}
+	   						return m, nil
+	   					}
+	   					if cmd == "__search__" {
+	   						sm := search.NewSearchModel(m.computeClient, m.networkClient, m.storageClient, m.imageClient, m.width, m.height)
+	   						m.searchModel = &sm
+	   						m.state = stateSearch
+	   						m.commandBar.SetValue("")
+	   						m.commandBar.Blur()
+	   						// reset tab autocomplete state
+	   						m.tabMatches = nil
+	   						m.tabIndex = 0
+	   						return m, sm.Init()
+	   					}
+	   					if section, ok := m.commandMap[cmd]; ok {
+	   						if section == "__quit__" {
+	   							return m, tea.Quit
+	   						}
+	   						m.navigateTo(section)
+	   						if section == "Topology" {
+	   							m.commandBar.SetValue("")
+	   							m.commandBar.Blur()
+	   							// reset tab autocomplete state
+	   							m.tabMatches = nil
+	   							m.tabIndex = 0
+	   							if m.topologyModel != nil {
+	   								return m, m.topologyModel.Init()
+	   							}
+	   							return m, nil
+	   						}
+	   						m.state = stateMain
+	   						m.commandBar.SetValue("")
+	   						m.commandBar.Blur()
+	   						// reset tab autocomplete state
+	   						m.tabMatches = nil
+	   						m.tabIndex = 0
+	   						return m, m.mainModel.Init()
+	   					}
+
+	   					// unknown command: clear input
+	   					m.commandBar.SetValue("")
+	   					// reset tab autocomplete state
+	   					m.tabMatches = nil
+	   					m.tabIndex = 0
+	   					return m, nil
+	   				case "tab":
+	   					prefix := strings.TrimSpace(m.commandBar.Value())
+	   					// Collect and sort all matches
+	   					var matches []string
+	   					for k := range m.commandMap {
+	   						if strings.HasPrefix(k, prefix) {
+	   							matches = append(matches, k)
+	   						}
+	   					}
+	   					sort.Strings(matches)
+	   					if len(matches) == 0 {
+	   						return m, nil
+	   					}
+	   					// If prefix changed, reset cycle
+	   					if len(m.tabMatches) == 0 || m.commandBar.Value() != m.tabMatches[m.tabIndex] {
+	   						m.tabMatches = matches
+	   						m.tabIndex = 0
+	   					} else {
+	   						m.tabIndex = (m.tabIndex + 1) % len(m.tabMatches)
+	   					}
+	   					m.commandBar.SetValue(m.tabMatches[m.tabIndex])
+	   					return m, nil
+	   				default:
+	   					var cmd tea.Cmd
+	   					m.commandBar, cmd = m.commandBar.Update(msg)
+	   					return m, cmd
+	   				}
+	   			}
+	   		}
+	   		// ignore other messages
+	*/
 	// When in sidebar state, forward updates to the list component.
 	if m.state == stateSidebar {
 		var cmd tea.Cmd
@@ -865,6 +1386,63 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// executeAction performs the pending action asynchronously and returns a command that yields an actionResultMsg.
+func executeAction(m AppModel) tea.Cmd {
+	pending := m.pendingAction
+	target := m.actionTarget
+	resource := m.actionResource
+	input := m.pendingInput
+
+	return func() tea.Msg {
+		var err error
+		switch resource {
+		case "instance":
+			switch pending.Key {
+			case "start":
+				err = m.computeClient.StartInstance(target)
+			case "stop":
+				err = m.computeClient.StopInstance(target)
+			case "reboot":
+				err = m.computeClient.RebootInstance(target)
+			case "delete":
+				err = m.computeClient.DeleteInstance(target)
+			}
+		case "volume":
+			switch pending.Key {
+			case "delete":
+				err = m.storageClient.DeleteVolume(target)
+			case "extend":
+				size, convErr := strconv.Atoi(input)
+				if convErr != nil {
+					err = fmt.Errorf("invalid size: %v", convErr)
+				} else {
+					err = m.storageClient.ExtendVolume(target, size)
+				}
+			}
+		case "network":
+			if pending.Key == "delete" {
+				err = m.networkClient.DeleteNetwork(target)
+			}
+		case "floatingip":
+			switch pending.Key {
+			case "associate":
+				_, err = m.networkClient.AssociateFloatingIP(target, input)
+			case "disassociate":
+				_, err = m.networkClient.DisassociateFloatingIP(target)
+			case "delete":
+				err = m.networkClient.ReleaseFloatingIP(target)
+			}
+		default:
+			err = fmt.Errorf("unsupported resource %s for action %s", resource, pending.Key)
+		}
+		if err != nil {
+			return actionResultMsg{success: false, message: err.Error()}
+		}
+		msg := fmt.Sprintf("%s %s succeeded", pending.Label, target)
+		return actionResultMsg{success: true, message: msg}
+	}
+}
+
 // View implements tea.Model.
 func (m AppModel) View() string {
 	footer := fmt.Sprintf("\n[%s] Press : for command mode  [T] topology  [/]", m.state) + " search"
@@ -917,6 +1495,21 @@ func (m AppModel) View() string {
 		return fmt.Sprintf("\n%s view – press esc to return\n", m.selectedItem.title) + footer
 	case stateModal:
 		return "\n[Modal] Press esc to close\n" + footer
+	case stateAction:
+		if m.actionMenu != nil {
+			return m.actionMenu.View() + footer
+		}
+		return "" + footer
+	case stateConfirm:
+		if m.confirmModal != nil {
+			return m.confirmModal.View() + footer
+		}
+		return "" + footer
+	case stateInput:
+		if m.inputModel != nil {
+			return m.inputModel.View() + footer
+		}
+		return "" + footer
 	case stateDetail:
 		if m.detailModel != nil {
 			return m.detailModel.View() + footer

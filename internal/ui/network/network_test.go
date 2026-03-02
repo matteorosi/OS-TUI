@@ -136,6 +136,9 @@ func (m *mockNetworkClient) CreateSecurityGroupRule(ctx context.Context, sgID st
 func (m *mockNetworkClient) DeleteSecurityGroupRule(ctx context.Context, id string) error {
 	return nil
 }
+func (m *mockNetworkClient) DeleteNetwork(id string) error {
+	return nil
+}
 
 func TestRenderNetworksSuccess(t *testing.T) {
 	mock := &mockNetworkClient{networks: []networks.Network{{ID: "net-1", Name: "net1", Status: "ACTIVE"}}}

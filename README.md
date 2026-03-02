@@ -1,15 +1,16 @@
-# OS-Tui
+# OS-TUI
 
 A terminal user interface (TUI) for managing OpenStack clouds, built with Go, Bubble Tea, and Gophercloud.
 
 ![Go Version](https://img.shields.io/badge/go-1.22+-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
+![Release](https://img.shields.io/github/v/release/matteorosi/OS-TUI)
 
 ---
 
 ## Screenshots
 
-**Sidebar — resource navigation**
+**Sidebar — resource navigation with quick reference panel**
 <img width="878" alt="Sidebar" src="https://github.com/user-attachments/assets/7e68bf7e-67c8-4012-9f0e-ad7f17e4bf55" />
 
 **Limits — quota usage with colored bars**
@@ -17,16 +18,18 @@ A terminal user interface (TUI) for managing OpenStack clouds, built with Go, Bu
 
 ---
 
-
 ## Features
 
 - **Full resource browsing** — navigate all major OpenStack services from a single interface. Every resource is drill-down navigable with `Enter`.
+- **Global search** — press `/` from the sidebar to search across all services simultaneously. Queries run in parallel against Compute, Network, Storage, and more.
 - **Relationship graph** — press `g` to visualize connected objects (volumes, ports, networks, floating IPs, load balancers) as an ASCII graph.
+- **Topology view** — press `T` for a flat tree of all resources grouped by network.
 - **Command mode** — press `:` for instant navigation with Tab autocomplete and inline suggestions.
 - **Shell passthrough** — use `:!` to run any `openstack` CLI command. Output appears in a scrollable viewport inside the TUI.
 - **Log streaming** — press `l` on any server for live console logs with pause/resume and adjustable refresh interval.
 - **Token caching** — authentication tokens are cached to disk and reused across sessions. No re-auth on every launch.
 - **Parallel client creation** — all service clients are initialized concurrently for fast startup.
+- **Dynamic layout** — sidebar and tables adapt to terminal dimensions automatically.
 - **Debug mode** — verbose output with `--debug` flag.
 - **Context-sensitive help** — press `?` for keybindings relevant to the current view.
 
@@ -73,6 +76,14 @@ Available for: Servers, Networks, Volumes, Floating IPs, Load Balancers.
 
 ---
 
+## Global Search
+
+Press `/` from the sidebar to open the global search overlay. Type to search — queries run live in parallel across all OpenStack services.
+
+Results are grouped by category (Servers, Networks, Volumes, etc.) and can be opened directly with `Enter`.
+
+---
+
 ## Installation
 
 **Requirements:** Go 1.22+
@@ -80,8 +91,8 @@ Available for: Servers, Networks, Volumes, Floating IPs, Load Balancers.
 ### Run directly
 
 ```bash
-git clone https://github.com/your-org/ostui.git
-cd ostui
+git clone https://github.com/matteorosi/OS-TUI.git
+cd OS-TUI
 go run ./cmd/ostui/main.go --cloud mycloud
 ```
 
@@ -99,6 +110,10 @@ go install ./cmd/ostui
 ostui --cloud mycloud
 ```
 
+### Download pre-built binary
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/matteorosi/OS-TUI/releases).
+
 ---
 
 ## Quick Start
@@ -108,23 +123,12 @@ ostui --cloud mycloud
 ostui reads from your existing `clouds.yaml`. To see which clouds are configured:
 
 ```bash
-# Default location
 cat ~/.config/openstack/clouds.yaml
 
-# The cloud names are the top-level keys, e.g.:
 # clouds:
 #   mycloud:        ← this is your cloud name
 #     auth:
 #       auth_url: https://...
-#   production:     ← or this one
-#     auth:
-#       ...
-```
-
-You can also check which cloud is currently active:
-
-```bash
-echo $OS_CLOUD
 ```
 
 ### 2. Launch
@@ -147,8 +151,8 @@ OS_CLIENT_CONFIG_FILE=/path/to/clouds.yaml go run ./cmd/ostui/main.go --cloud my
 
 | Flag | Description |
 |---|---|
-| `--cloud <n>` | Cloud name from `clouds.yaml` (required) |
-| `--project <n>` | OpenStack project to work with (optional) |
+| `--cloud <name>` | Cloud name from `clouds.yaml` (required) |
+| `--project <name>` | OpenStack project to work with (optional) |
 | `--debug` | Enable verbose debug logging |
 
 ### Keyboard shortcuts
@@ -163,11 +167,11 @@ OS_CLIENT_CONFIG_FILE=/path/to/clouds.yaml go run ./cmd/ostui/main.go --cloud my
 | `i` | Inspect (raw fields) |
 | `y` | JSON view |
 | `v` | Console URL |
-| `/` | Filter list |
+| `/` | Global search (from sidebar) or filter list (in resource views) |
 | `:` | Command mode |
 | `?` | Context-sensitive help |
 | `c` | Switch cloud |
-| `T` | Topology View |
+| `T` | Topology view |
 | `q` | Quit |
 
 ### Command mode
@@ -184,6 +188,8 @@ OS_CLIENT_CONFIG_FILE=/path/to/clouds.yaml go run ./cmd/ostui/main.go --cloud my
 | `routers` | | Routers |
 | `floatingips` | `fip` | Floating IPs |
 | `secgroups` | `sg` | Security Groups |
+| `topology` | `topo` | Topology view |
+| `search` | | Global search |
 | `quit` | | Exit |
 | `!<cmd>` | | Run `openstack <cmd>` inline |
 
@@ -193,20 +199,26 @@ OS_CLIENT_CONFIG_FILE=/path/to/clouds.yaml go run ./cmd/ostui/main.go --cloud my
 
 ```
 cmd/ostui/
-  main.go           ← entry point
+  main.go               ← entry point
 internal/
-  client/           ← OpenStack client interfaces (compute, network, storage, dns, lb…)
+  cache/                ← in-memory TTL cache
+  client/               ← OpenStack client interfaces (compute, network, storage, dns, lb…)
+  config/               ← clouds.yaml loader
   ui/
-    app.go          ← root model, state machine
-    compute/        ← servers, flavors, keypairs, hypervisors, limits, logs, graph
-    network/        ← networks, subnets, routers, ports, floating IPs, security groups
-    storage/        ← volumes, snapshots
-    image/          ← images
-    identity/       ← projects, users, token
-    dns/            ← zones, record sets
-    loadbalancer/   ← load balancers, listeners, pools
-    graph/          ← generic relationship graph
-    shell/          ← openstack CLI passthrough
+    app.go              ← root model, state machine
+    uiconst/            ← shared UI constants (column widths, table heights)
+    common/             ← reusable components (table, confirm dialog, action menu)
+    compute/            ← servers, flavors, keypairs, hypervisors, limits, logs, graph
+    network/            ← networks, subnets, routers, ports, floating IPs, security groups
+    storage/            ← volumes, snapshots
+    image/              ← images
+    identity/           ← projects, users, token
+    dns/                ← zones, record sets
+    loadbalancer/       ← load balancers, listeners, pools
+    graph/              ← generic relationship graph
+    search/             ← global search across all services
+    shell/              ← openstack CLI passthrough
+    topology/           ← topology view
 ```
 
 ---
@@ -215,7 +227,9 @@ internal/
 
 - **[Bubble Tea](https://github.com/charmbracelet/bubbletea)** — TUI framework
 - **[Lipgloss](https://github.com/charmbracelet/lipgloss)** — terminal styling
+- **[Bubbles](https://github.com/charmbracelet/bubbles)** — UI components (table, textinput, spinner, list)
 - **[gophercloud](https://github.com/gophercloud/gophercloud)** — OpenStack SDK
+- **[errgroup](https://pkg.go.dev/golang.org/x/sync/errgroup)** — parallel API queries
 - **Go 1.22**
 
 ---

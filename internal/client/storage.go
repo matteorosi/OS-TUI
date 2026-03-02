@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/snapshots"
 	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 )
@@ -15,6 +16,7 @@ type StorageClient interface {
 	DeleteVolume(id string) error
 	ListSnapshots() ([]snapshots.Snapshot, error)
 	CreateSnapshot(opts snapshots.CreateOptsBuilder) (snapshots.Snapshot, error)
+	ExtendVolume(id string, newSizeGB int) error
 }
 
 type storageClient struct {
@@ -75,6 +77,12 @@ func (c *storageClient) CreateSnapshot(opts snapshots.CreateOptsBuilder) (snapsh
 		return snapshots.Snapshot{}, err
 	}
 	return *snap, nil
+}
+
+// ExtendVolume extends the size of a volume.
+func (c *storageClient) ExtendVolume(id string, newSizeGB int) error {
+	opts := volumeactions.ExtendSizeOpts{NewSize: newSizeGB}
+	return volumeactions.ExtendSize(c.client, id, opts).ExtractErr()
 }
 
 // Ensure storageClient implements the StorageClient interface.

@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go build ./...)",
+      "Bash(grep -n \"func.*View\\\\\\(\\\\\\)\" /Users/matteo.rosi/Work/ostui/internal/ui/common/*.go)",
+      "Bash(go test ./...)",
+      "Bash(git add docs/plans/2026-03-02-predictive-prefetching-design.md)",
+      "Bash(git commit:*)",
+      "Bash(grep -n \"type ComputeClient interface\\\\|type NetworkClient interface\\\\|type StorageClient interface\" /Users/matteo.rosi/Work/ostui/internal/client/*.go)",
+      "Bash(git add docs/plans/2026-03-02-predictive-prefetching.md)",
+      "Bash(go test ./internal/client/... -run TestCachedCompute -v)",
+      "Bash(go vet ./...)",
+      "Bash(git add internal/client/cached_compute.go internal/client/client_test.go)",
+      "Bash(go test ./internal/client/... -run TestCachedNetwork -v)",
+      "Bash(git -C /Users/matteo.rosi/Work/ostui add internal/client/cached_network.go internal/client/client_test.go)",
+      "Bash(git -C:*)",
+      "Bash(go test ./internal/client/... -v)",
+      "Bash(git add internal/client/cached_network.go internal/client/client_test.go)",
+      "Bash(go test ./internal/client/... -run TestCachedStorage -v)",
+      "Bash(git add internal/client/cached_storage.go internal/client/client_test.go)",
+      "Bash(python3 -c \":*)",
+      "Bash(git add internal/ui/app.go)"
+    ]
+  }
+}
