@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sort"
 	"strings"
 	"time"
 
@@ -369,6 +370,82 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		// Clear any previous action result on any key press
 		m.actionResult = ""
+		// Forward ALL keys to command bar when in command state.
+		if m.state == stateCommand {
+			var cmd tea.Cmd
+			m.commandBar, cmd = m.commandBar.Update(msg)
+			// Handle special keys
+			switch msg.String() {
+			case "esc":
+				m.state = m.prevState
+				m.prevState = ""
+				m.commandBar.Blur()
+				m.commandBar.SetValue("")
+				m.tabMatches = nil
+				m.tabIndex = 0
+				return m, nil
+			case "enter":
+				cmdStr := strings.TrimSpace(m.commandBar.Value())
+				m.commandBar.SetValue("")
+				m.commandBar.Blur()
+				m.tabMatches = nil
+				m.tabIndex = 0
+				if strings.HasPrefix(cmdStr, "!") {
+					command := strings.TrimPrefix(cmdStr, "!")
+					sm := shell.NewShellModel(m.cloudName, command)
+					m.shellModel = &sm
+					m.state = stateShell
+					return m, m.shellModel.Init()
+				}
+				if cmdStr == "topology" || cmdStr == "topo" {
+					m.navigateTo("Topology")
+					if m.topologyModel != nil {
+						return m, m.topologyModel.Init()
+					}
+					return m, nil
+				}
+				if cmdStr == "__search__" || cmdStr == "search" {
+					sm := search.NewSearchModel(m.computeClient, m.networkClient, m.storageClient, m.imageClient, m.width, m.height)
+					m.searchModel = &sm
+					m.state = stateSearch
+					return m, sm.Init()
+				}
+				if section, ok := m.commandMap[cmdStr]; ok {
+					if section == "__quit__" {
+						return m, tea.Quit
+					}
+					m.navigateTo(section)
+					m.state = stateMain
+					if m.mainModel != nil {
+						return m, m.mainModel.Init()
+					}
+					return m, nil
+				}
+				m.state = m.prevState
+				return m, nil
+			case "tab":
+				prefix := strings.TrimSpace(m.commandBar.Value())
+				var matches []string
+				for k := range m.commandMap {
+					if strings.HasPrefix(k, prefix) {
+						matches = append(matches, k)
+					}
+				}
+				sort.Strings(matches)
+				if len(matches) == 0 {
+					return m, nil
+				}
+				if len(m.tabMatches) == 0 || m.commandBar.Value() != m.tabMatches[m.tabIndex] {
+					m.tabMatches = matches
+					m.tabIndex = 0
+				} else {
+					m.tabIndex = (m.tabIndex + 1) % len(m.tabMatches)
+				}
+				m.commandBar.SetValue(m.tabMatches[m.tabIndex])
+				return m, nil
+			}
+			return m, cmd
+		}
 		// Forward ALL keys to search model when in search state.
 		if m.state == stateSearch && m.searchModel != nil {
 			var cmd tea.Cmd
