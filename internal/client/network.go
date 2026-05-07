@@ -285,5 +285,4 @@ func (c *networkClient) DeleteNetwork(id string) error {
 	return networks.Delete(c.client, id).ExtractErr()
 }
 
-// Ensure NetworkClient implements the interface.
 var _ NetworkClient = (*networkClient)(nil)

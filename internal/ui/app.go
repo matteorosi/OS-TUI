@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"sort"
 	"strings"
+	"log"
 	"time"
 
 	"github.com/charmbracelet/bubbles/list"
@@ -64,6 +65,7 @@ const (
 	stateGraph       = "graph"
 	stateTopology    = "topology"
 	stateSearch      = "search"
+	stateProjectSelect = "projectSelect"
 	stateAction      = "action"
 	stateConfirm     = "confirm"
 	stateInput       = "input"
@@ -113,6 +115,10 @@ type AppModel struct {
 	// topologyModel holds the topology view model.
 	topologyModel *topology.TopologyModel
 	searchModel   *search.SearchModel
+	// projectList holds the list of projects for selection.
+	projectList list.Model
+	// currentProject holds the currently selected project name.
+	currentProject string
 	// commandBar is the text input for command mode.
 	commandBar textinput.Model
 	// commandMap maps command strings to section titles.
@@ -509,6 +515,27 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			l.Styles.Title = lipgloss.NewStyle().Bold(true)
 			m.cloudList = l
 			m.state = stateCloudSelect
+			return m, nil
+		case "p":
+			// Open project selection list
+			projects, err := m.identityClient.ListProjects()
+			if err != nil {
+				log.Printf("warning: failed to list projects: %v", err)
+				return m, nil
+			}
+			var items []list.Item
+			for _, p := range projects {
+				items = append(items, cloudItem{name: p.Name})
+			}
+			const projectListWidth = 30
+			const projectListHeight = 10
+			pl := list.New(items, list.NewDefaultDelegate(), projectListWidth, projectListHeight)
+			pl.Title = "Select Project"
+			pl.SetShowStatusBar(false)
+			pl.SetFilteringEnabled(false)
+			pl.Styles.Title = lipgloss.NewStyle().Bold(true)
+			m.projectList = pl
+			m.state = stateProjectSelect
 			return m, nil
 		case "T":
 			// Open topology view
@@ -1357,6 +1384,20 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, cmd
 	}
+	if m.state == stateProjectSelect {
+		var cmd tea.Cmd
+		m.projectList, cmd = m.projectList.Update(msg)
+		if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "enter" {
+			if ci, ok := m.projectList.SelectedItem().(cloudItem); ok {
+				m.currentProject = ci.name
+				log.Printf("Project selected: %s", m.currentProject)
+				// Note: Full project switching requires re-authentication
+				// For now, we just update the UI display
+			}
+			m.state = stateSidebar
+		}
+		return m, cmd
+	}
 	if m.state == stateMain && m.mainModel != nil {
 		var cmd tea.Cmd
 		m.mainModel, cmd = m.mainModel.Update(msg)
@@ -1545,13 +1586,14 @@ func (m AppModel) View() string {
 		help := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render
 		accent := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("205")).Render
 		rightContent := accent("Cloud: ") + m.cloudName + "\n\n" +
+			accent("Project: ") + m.currentProject + "\n\n" +
 			accent("Navigation") + "\n" +
 			help("  ↑/k  up          ↓/j  down") + "\n" +
 			help("  enter  open      esc  back") + "\n\n" +
 			accent("Global keys") + "\n" +
 			help("  ?   help         c   switch cloud") + "\n" +
-			help("  T   topology     :   command mode") + "\n" +
-			help("  g   graph        y   JSON view") + "\n" +
+			help("  p   switch proj  T   topology") + "\n" +
+			help("  g   graph        :   command mode") + "\n" +
 			help("  i   inspect      l   logs (servers)") + "\n\n" +
 			accent("Commands") + "\n" +
 			help("  :servers  :networks  :volumes") + "\n" +

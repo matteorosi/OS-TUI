@@ -86,4 +86,3 @@ func (c *storageClient) ExtendVolume(id string, newSizeGB int) error {
 }
 
 // Ensure storageClient implements the StorageClient interface.
-var _ StorageClient = (*storageClient)(nil)
