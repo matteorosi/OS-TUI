@@ -145,8 +145,12 @@ func (m LogsModel) View() string {
 	if m.err != nil {
 		return fmt.Sprintf("Error: %s", m.err)
 	}
-	header := fmt.Sprintf("Server: %s | Streaming: %t | Interval: %s", m.serverID, m.streaming, m.interval)
-	footer := fmt.Sprintf(" %3.f%% | [j/k] scroll [g/G] top/bottom [p] pause [esc] back", m.viewport.ScrollPercent()*100)
+	streamStatus := "PAUSED"
+	if m.streaming {
+		streamStatus = "STREAMING"
+	}
+	header := fmt.Sprintf("Server: %s | %s | Interval: %s", m.serverID, streamStatus, m.interval)
+	footer := fmt.Sprintf(" %3.f%% | [j/k] scroll [g/G] top/bottom [p] toggle [esc] back", m.viewport.ScrollPercent()*100)
 	return fmt.Sprintf("%s\n%s\n%s", header, m.viewport.View(), footer)
 }
 
